@@ -1,0 +1,81 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+}
+model Developer {
+  id            String    @id @default(cuid()) // Unique identifier
+  walletAddress String    @unique // Ethereum wallet address
+  apiKeys       ApiKey[] // Linked API keys
+  projects      Project[] // Associated projects
+  createdAt     DateTime  @default(now()) // Timestamp of developer creation
+}
+
+model Project {
+  id              String           @id @default(cuid()) // Project unique identifier
+  name            String // Project name (provided by user)
+  pricingModel    String // Pricing model chosen
+  paymentAddress  String // Payment receiving address
+  developer       Developer        @relation(fields: [developerId], references: [id])
+  developerId     String
+  pricingRules    PricingRule[] // Project's pricing rules
+  receipts        Receipt[] // Associated payment receipts
+  devices         Device[] // Devices registered to project
+  installAttempts InstallAttempt[] // Install attempts
+  createdAt       DateTime         @default(now())
+  apiKeys         ApiKey[] // API keys for the project
+}
+
+model ApiKey {
+  id          String    @id @default(cuid()) // API key ID
+  value       String    @unique // API key value
+  project     Project   @relation(fields: [projectId], references: [id])
+  projectId   String
+  createdAt   DateTime  @default(now()) // When this key was created
+  rotatedAt   DateTime? // When this key was last rotated
+  developer   Developer @relation(fields: [developerId], references: [id])
+  developerId String
+}
+
+model PricingRule {
+  id        String  @id @default(cuid()) // Unique PricingRule
+  project   Project @relation(fields: [projectId], references: [id])
+  projectId String
+  model     String // Pricing model string
+  amount    Int // Cost/amount designated by rule
+}
+
+model Receipt {
+  id        String   @id @default(cuid()) // Receipt ID
+  project   Project  @relation(fields: [projectId], references: [id])
+  projectId String
+  token     String   @unique // Unique payment token
+  amount    Int // Amount paid
+  createdAt DateTime @default(now()) // When payment was made
+}
+
+model Device {
+  id        String   @id // Device ID
+  project   Project  @relation(fields: [projectId], references: [id])
+  projectId String
+  createdAt DateTime @default(now()) // When device registered
+}
+
+model InstallAttempt {
+  id           String   @id @default(cuid()) // Unique attempt ID
+  project      Project  @relation(fields: [projectId], references: [id])
+  projectId    String
+  deviceId     String? // Device (if known)
+  version      String // App version
+  status       String // Status (success, fail, etc.)
+  sessionToken String?  @unique // Optional install session token
+  createdAt    DateTime @default(now()) // When attempt occurred
+}
