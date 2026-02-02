@@ -5,7 +5,10 @@ import ContextProvider from "@/context";
 import { headers } from "next/headers";
 import { Sidebar } from "@/components/common/sidebar";
 
-const notoSans = Noto_Sans({ variable: "--font-sans" });
+const notoSans = Noto_Sans({
+	variable: "--font-sans",
+	subsets: ["latin"],
+});
 
 const geistSans = Geist({
 	variable: "--font-geist-sans",
