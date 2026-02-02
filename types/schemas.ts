@@ -21,3 +21,8 @@ export const projectRotateSchema = z.object({
 
 export type ProjectCreateInput = z.infer<typeof projectCreateSchema>;
 export type ProjectRotateInput = z.infer<typeof projectRotateSchema>;
+
+export const billingSchema = z.object({
+	projectId: z.string().min(1),
+});
+export type BillingSchema = z.infer<typeof billingSchema>;

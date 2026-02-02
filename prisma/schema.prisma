@@ -32,6 +32,16 @@ model Project {
   installAttempts InstallAttempt[] // Install attempts
   createdAt       DateTime         @default(now())
   apiKeys         ApiKey[] // API keys for the project
+  entitlement    Entitlement[] // Entitlements for the project
+}
+
+model Entitlement {
+  id        String    @id @default(cuid())
+  project   Project   @relation(fields: [projectId], references: [id])
+  projectId String
+  deviceId  String?
+  version   String?
+  expiresAt DateTime?
 }
 
 model ApiKey {
