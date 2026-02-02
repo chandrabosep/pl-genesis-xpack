@@ -1,18 +1,13 @@
-require("dotenv").config();
 const crypto = require("crypto");
+const path = require("path");
 const { hostname, platform } = require("os");
 
-const apiKey = process.env.API_KEY;
-const projectId = process.env.PROJECT_ID;
-const apiHost = normalizeHost(process.env.HOST || "https://yourapp.com");
-const docsUrl = process.env.DOCS_URL || "https://yourapp.com/docs/payments";
-
-function requireEnv() {
-	if (!apiKey || !projectId) {
-		console.error("Missing API key or project ID. Add them to your .env.");
-		process.exit(1);
-	}
-}
+const pkg = require(path.join(__dirname, "package.json"));
+const xpack = pkg.xpack || {};
+const projectId = xpack.projectId;
+const apiKey = xpack.apiKey;
+const apiHost = normalizeHost(xpack.host);
+const docsUrl = xpack.docsUrl;
 
 function deviceFingerprint() {
 	const raw = `${hostname()}-${platform()}`;
@@ -20,8 +15,13 @@ function deviceFingerprint() {
 }
 
 async function startInstall() {
-	requireEnv();
-	const version = process.env.npm_package_version || "0.0.0";
+	if (!projectId || !apiKey) {
+		console.error(
+			"Missing xpack config. Add xpack.projectId and xpack.apiKey to package.json.",
+		);
+		process.exit(1);
+	}
+	const version = pkg.version || "0.0.0";
 	console.log(`Validating install against ${apiHost}.`);
 	const response = await fetch(`${apiHost}/api/install/start`, {
 		method: "POST",
@@ -47,25 +47,43 @@ async function startInstall() {
 			session && apiHost
 				? `${apiHost}/pay?session=${session}`
 				: (docsUrl ?? "not provided");
-		console.error("");
-		console.error("");
-		console.error("");
-		console.error("");
-		console.error("");
-		console.error(
-			"======================= PAYMENT REQUIRED ==========================================",
-		);
-		console.error(`Price: ${price}`);
-		console.error(`Pay here: ${payUrl}`);
-		console.error("After payment, rerun npm install.");
-		console.error(
-			"======================= END ==========================================",
-		);
-		console.error("");
-		console.error("");
-		console.error("");
-		console.error("");
 
+		// ANSI colors (work in most terminals)
+		const R = "\x1b[0m";
+		const BOLD = "\x1b[1m";
+		const DIM = "\x1b[2m";
+		const UNDERLINE = "\x1b[4m";
+		const GOLD = "\x1b[93m";
+		const GREEN = "\x1b[92m";
+		const CYAN = "\x1b[96m";
+		const MAGENTA = "\x1b[95m";
+		const BOX = "\x1b[90m";
+		const SEP = "▓▓".repeat(22);
+
+		// Use stdout so npm shows this as notice/info, not "npm error"
+		console.log("");
+		console.log(`  ${BOX}${SEP}${R}`);
+		console.log("");
+		console.log(`     ${GOLD}${BOLD}💳  PAYMENT REQUIRED${R}`);
+		console.log(`     ${DIM}Pay below to unlock this package.${R}`);
+		console.log("");
+		console.log(`  ${BOX}${SEP}${R}`);
+		console.log("");
+		console.log(`     ${GREEN}${BOLD}►  PAY HERE${R}  ${DIM}—  Open in browser or copy this link:${R}`);
+		console.log("");
+		console.log(`  ${BOX}${SEP}${R}`);
+		console.log("");
+		console.log(`  ${CYAN}${BOLD}${UNDERLINE}${payUrl}${R}`);
+		console.log("");
+		console.log(`  ${DIM}↑ Copy the full URL above (one line). If it wrapped, paste both parts together.${R}`);
+		console.log("");
+		console.log(`  ${BOX}${SEP}${R}`);
+		console.log(`     ${BOX}${R}`);
+		console.log(`     ${MAGENTA}Price: ${String(price)}${R}`);
+		console.log(`     After payment, run:  ${BOLD}npm install${R}`);
+		console.log("");
+		console.log(`  ${BOX}${SEP}${R}`);
+		console.log("");
 		process.exit(1);
 	}
 

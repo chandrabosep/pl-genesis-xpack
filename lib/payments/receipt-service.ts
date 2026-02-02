@@ -50,7 +50,6 @@ export async function linkReceiptToEntitlement(
 	const entitlementData = buildEntitlementData(
 		pricingModel,
 		attempt.deviceId,
-		attempt.version,
 		project.id
 	);
 
@@ -67,15 +66,15 @@ export async function linkReceiptToEntitlement(
 function buildEntitlementData(
 	pricingModel: PricingModel,
 	deviceId: string | null | undefined,
-	version: string | null | undefined,
 	projectId: string
 ) {
-	if (pricingModel === "one_time") {
-		return { projectId };
-	}
 	if (pricingModel === "subscription") {
+		if (!deviceId) {
+			throw new Error("Device is required for subscription entitlements");
+		}
 		return {
 			projectId,
+			deviceId,
 			expiresAt: new Date(
 				Date.now() + SUBSCRIPTION_DAYS * 24 * 60 * 60 * 1000
 			),
@@ -86,12 +85,6 @@ function buildEntitlementData(
 			throw new Error("Device is required for per_device entitlements");
 		}
 		return { projectId, deviceId };
-	}
-	if (pricingModel === "per_version") {
-		if (!version) {
-			throw new Error("Version is required for per_version entitlements");
-		}
-		return { projectId, version };
 	}
 	return null;
 }

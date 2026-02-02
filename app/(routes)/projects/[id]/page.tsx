@@ -39,21 +39,16 @@ import {
 	X,
 } from "lucide-react";
 
-const PREINSTALL_SCRIPT = `require("dotenv").config();
-const crypto = require("crypto");
+const PREINSTALL_SCRIPT = `const crypto = require("crypto");
+const path = require("path");
 const { hostname, platform } = require("os");
 
-const apiKey = process.env.API_KEY;
-const projectId = process.env.PROJECT_ID;
-const apiHost = normalizeHost(process.env.HOST || "https://yourapp.com");
-const docsUrl = process.env.DOCS_URL || "https://yourapp.com/docs/payments";
-
-function requireEnv() {
-	if (!apiKey || !projectId) {
-		console.error("Missing API key or project ID. Add them to your .env.");
-		process.exit(1);
-	}
-}
+const pkg = require(path.join(__dirname, "package.json"));
+const xpack = pkg.xpack || {};
+const projectId = xpack.projectId;
+const apiKey = xpack.apiKey;
+const apiHost = normalizeHost(xpack.host);
+const docsUrl = xpack.docsUrl;
 
 function deviceFingerprint() {
 	const raw = \`\${hostname()}-\${platform()}\`;
@@ -61,8 +56,11 @@ function deviceFingerprint() {
 }
 
 async function startInstall() {
-	requireEnv();
-	const version = process.env.npm_package_version || "0.0.0";
+	if (!projectId || !apiKey) {
+		console.error("Missing xpack config. Add xpack.projectId and xpack.apiKey to package.json.");
+		process.exit(1);
+	}
+	const version = pkg.version || "0.0.0";
 	console.log(\`Validating install against \${apiHost}.\`);
 	const response = await fetch(\`\${apiHost}/api/install/start\`, {
 		method: "POST",
@@ -88,25 +86,43 @@ async function startInstall() {
 			session && apiHost
 				? \`\${apiHost}/pay?session=\${session}\`
 				: (docsUrl ?? "not provided");
-		console.error("");
-		console.error("");
-		console.error("");
-		console.error("");
-		console.error("");
-		console.error(
-			"======================= PAYMENT REQUIRED ==========================================",
-		);
-		console.error(\`Price: \${price}\`);
-		console.error(\`Pay here: \${payUrl}\`);
-		console.error("After payment, rerun npm install.");
-		console.error(
-			"======================= END ==========================================",
-		);
-		console.error("");
-		console.error("");
-		console.error("");
-		console.error("");
 
+		// ANSI colors (work in most terminals)
+		const R = "\\x1b[0m";
+		const BOLD = "\\x1b[1m";
+		const DIM = "\\x1b[2m";
+		const UNDERLINE = "\\x1b[4m";
+		const GOLD = "\\x1b[93m";
+		const GREEN = "\\x1b[92m";
+		const CYAN = "\\x1b[96m";
+		const MAGENTA = "\\x1b[95m";
+		const BOX = "\\x1b[90m";
+		const SEP = "▓▓".repeat(22);
+
+		// Use stdout so npm shows this as notice/info, not "npm error"
+		console.log("");
+		console.log(\`  \${BOX}\${SEP}\${R}\`);
+		console.log("");
+		console.log("     💳  PAYMENT REQUIRED");
+		console.log("     Pay below to unlock this package.");
+		console.log("");
+		console.log(\`  \${BOX}\${SEP}\${R}\`);
+		console.log("");
+		console.log("     ►  PAY HERE  —  Open in browser or copy this link:");
+		console.log("");
+		console.log(\`  \${BOX}\${SEP}\${R}\`);
+		console.log("");
+		console.log(\`  \${CYAN}\${BOLD}\${UNDERLINE}\${payUrl}\${R}\`);
+		console.log("");
+		console.log(\`  \${DIM}↑ Copy the full URL above (one line). If it wrapped, paste both parts together.\${R}\`);
+		console.log("");
+		console.log(\`  \${BOX}\${SEP}\${R}\`);
+		console.log(\`     \${BOX}\${R}\`);
+		console.log(\`     \${MAGENTA}Price: \${String(price)}\${R}\`);
+		console.log(\`     After payment, run:  \${BOLD}npm install\${R}\`);
+		console.log("");
+		console.log(\`  \${BOX}\${SEP}\${R}\`);
+		console.log("");
 		process.exit(1);
 	}
 
@@ -127,10 +143,8 @@ function normalizeHost(host) {
 
 function pricingModelLabel(model: PricingModel): string {
 	const labels: Record<PricingModel, string> = {
-		one_time: "One-time",
-		subscription: "Subscription",
 		per_device: "Per device",
-		per_version: "Per version",
+		subscription: "Subscription",
 	};
 	return labels[model] ?? model;
 }
@@ -623,10 +637,12 @@ export default function ProjectDetailPage() {
 								</pre>
 							</li>
 							<li>
-								<span className="font-medium text-foreground">Dependency</span> (so the script can read their <code className="rounded bg-muted px-1 py-0.5 font-mono">.env</code>):
+								<span className="font-medium text-foreground">xpack config</span> (projectId and apiKey — no .env needed):
 								<pre className="mt-1 overflow-x-auto rounded-lg border bg-muted/50 p-3 font-mono text-xs">
-									{`"dependencies": {
-  "dotenv": "^16.4.5"
+									{`"xpack": {
+  "projectId": "YOUR_PROJECT_ID",
+  "apiKey": "YOUR_API_KEY",
+  "host": "https://yourapp.com"
 }`}
 								</pre>
 							</li>
@@ -647,8 +663,10 @@ export default function ProjectDetailPage() {
   "engines": {
     "node": ">=18.0.0"
   },
-  "dependencies": {
-    "dotenv": "^16.4.5"
+  "xpack": {
+    "projectId": "YOUR_PROJECT_ID",
+    "apiKey": "YOUR_API_KEY",
+    "host": "https://yourapp.com"
   }
 }`}</code>
 							</pre>
@@ -664,8 +682,10 @@ export default function ProjectDetailPage() {
   "engines": {
     "node": ">=18.0.0"
   },
-  "dependencies": {
-    "dotenv": "^16.4.5"
+  "xpack": {
+    "projectId": "YOUR_PROJECT_ID",
+    "apiKey": "YOUR_API_KEY",
+    "host": "https://yourapp.com"
   }
 }`}
 									label="Copy example package.json"
@@ -676,7 +696,7 @@ export default function ProjectDetailPage() {
 					</div>
 
 					<p className="text-sm text-muted-foreground">
-						Users will need to set <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">API_KEY</code> and <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">PROJECT_ID</code> in their <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">.env</code> (use the Project ID and API key from this page).
+						Add <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">xpack.projectId</code> and <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">xpack.apiKey</code> to your <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">package.json</code> (use the Project ID and API key from this page). No .env required.
 					</p>
 				</CardContent>
 			</Card>

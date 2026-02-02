@@ -58,13 +58,11 @@ type DashboardStats = {
 };
 
 function pricingModelLabel(model: PricingModel): string {
-  const labels: Record<PricingModel, string> = {
-    one_time: "One-time",
-    subscription: "Subscription",
-    per_device: "Per device",
-    per_version: "Per version",
-  };
-  return labels[model] ?? model;
+	const labels: Record<PricingModel, string> = {
+		per_device: "Per device",
+		subscription: "Subscription",
+	};
+	return labels[model] ?? model;
 }
 
 export default function DashboardPage() {
@@ -451,7 +449,7 @@ function CreatePackageButton(props: {
   const [name, setName] = useState("");
   const [price, setPrice] = useState("0.1");
   const [paymentAddress, setPaymentAddress] = useState("");
-  const [pricingModel, setPricingModel] = useState<PricingModel>("one_time");
+  const [pricingModel, setPricingModel] = useState<PricingModel>("per_device");
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -477,7 +475,7 @@ function CreatePackageButton(props: {
         setName("");
         setPrice("0.1");
         setPaymentAddress("");
-        setPricingModel("one_time");
+        setPricingModel("per_device");
         props.onCreated();
         router.push(`/projects/${project.id}`);
         return;

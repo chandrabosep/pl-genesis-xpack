@@ -2,10 +2,8 @@ import { z } from "zod";
 import type { PricingModel } from "./constants";
 
 const pricingModelSchema = z.enum([
-	"one_time",
-	"subscription",
 	"per_device",
-	"per_version",
+	"subscription",
 ] as const satisfies readonly PricingModel[]);
 
 export const projectCreateSchema = z.object({

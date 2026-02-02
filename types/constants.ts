@@ -1,8 +1,4 @@
-export type PricingModel =
-	| "one_time"
-	| "subscription"
-	| "per_device"
-	| "per_version";
+export type PricingModel = "per_device" | "subscription";
 
 /** x402 HTTP headers for payment-required responses */
 export const X402_HEADERS = {

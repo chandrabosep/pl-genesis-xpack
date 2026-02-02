@@ -2,13 +2,23 @@
 
 import { PricingModel } from "@/types/constants";
 import { ProjectSummary } from "@/types/projects";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select";
 
-const pricingOptions: PricingModel[] = [
-	"one_time",
-	"subscription",
-	"per_device",
-	"per_version",
-];
+const pricingOptions: PricingModel[] = ["per_device", "subscription"];
+
+function pricingOptionLabel(model: PricingModel): string {
+	const labels: Record<PricingModel, string> = {
+		per_device: "Per device",
+		subscription: "Subscription",
+	};
+	return labels[model] ?? model;
+}
 
 export function ProjectForm(props: {
 	name: string;
@@ -63,21 +73,23 @@ export function ProjectForm(props: {
 			</div>
 			<div className="flex flex-col gap-1">
 				<label className="text-sm font-medium">Pricing model</label>
-				<select
-					className="rounded border px-3 py-2"
+				<Select
 					value={props.pricingModel}
-					onChange={(event) =>
-						props.onPricingChange(
-							event.target.value as PricingModel,
-						)
+					onValueChange={(value) =>
+						props.onPricingChange(value as PricingModel)
 					}
 				>
-					{pricingOptions.map((option) => (
-						<option key={option} value={option}>
-							{option}
-						</option>
-					))}
-				</select>
+					<SelectTrigger className="w-full">
+						<SelectValue placeholder="Select pricing model" />
+					</SelectTrigger>
+					<SelectContent>
+						{pricingOptions.map((option) => (
+							<SelectItem key={option} value={option}>
+								{pricingOptionLabel(option)}
+							</SelectItem>
+						))}
+					</SelectContent>
+				</Select>
 			</div>
 			<button
 				type="submit"
@@ -119,14 +131,14 @@ export function ProjectList(props: {
 							</p>
 							<div className="mt-3 space-y-1 rounded border bg-neutral-50 p-3">
 								<p className="text-xs font-medium text-neutral-900">
-									Add to your .env file:
+									Add to package.json xpack:
 								</p>
 								<p className="text-xs text-neutral-700 break-all font-mono">
-									PAYGATE_PROJECT_ID=&quot;{project.id}&quot;
+									&quot;projectId&quot;: &quot;{project.id}&quot;
 								</p>
 								{project.apiKeyValue ? (
 									<p className="text-xs text-neutral-700 break-all font-mono">
-										PAYGATE_API_KEY=&quot;
+										&quot;apiKey&quot;: &quot;
 										{project.apiKeyValue}&quot;
 									</p>
 								) : null}

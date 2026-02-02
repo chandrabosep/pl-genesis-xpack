@@ -65,23 +65,17 @@ async function validateProjectApiKey(projectId: string, apiKey: string) {
 	return { project: key.project, apiKey: key };
 }
 
-/** Check if user is already entitled for this project/device/version */
+/** Check if user is already entitled for this project/device */
 async function hasEntitlement(
 	projectId: string,
 	pricingModel: PricingModel,
 	deviceId: string | undefined,
-	version: string | undefined
 ): Promise<boolean> {
-	if (pricingModel === "one_time") {
-		const count = await prisma.entitlement.count({
-			where: { projectId },
-		});
-		return count > 0;
-	}
-	if (pricingModel === "subscription") {
+	if (pricingModel === "subscription" && deviceId) {
 		const count = await prisma.entitlement.count({
 			where: {
 				projectId,
+				deviceId,
 				expiresAt: { gt: new Date() },
 			},
 		});
@@ -90,12 +84,6 @@ async function hasEntitlement(
 	if (pricingModel === "per_device" && deviceId) {
 		const count = await prisma.entitlement.count({
 			where: { projectId, deviceId },
-		});
-		return count > 0;
-	}
-	if (pricingModel === "per_version" && version) {
-		const count = await prisma.entitlement.count({
-			where: { projectId, version },
 		});
 		return count > 0;
 	}
@@ -149,8 +137,7 @@ export async function startInstall(body: InstallStartInput): Promise<InstallDeci
 	const entitled = await hasEntitlement(
 		project.id,
 		pricingModel,
-		deviceId,
-		version
+		deviceId
 	);
 	if (entitled) return { allowed: true };
 
@@ -209,8 +196,7 @@ export async function checkInstallStatus(
 	const entitled = await hasEntitlement(
 		project.id,
 		pricingModel,
-		deviceId,
-		version
+		deviceId
 	);
 	if (entitled) return { allowed: true };
 

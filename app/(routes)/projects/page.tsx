@@ -21,10 +21,8 @@ import { Copy, ChevronRight, Loader2, Package, Plus } from "lucide-react";
 
 function pricingModelLabel(model: PricingModel): string {
 	const labels: Record<PricingModel, string> = {
-		one_time: "One-time",
-		subscription: "Subscription",
 		per_device: "Per device",
-		per_version: "Per version",
+		subscription: "Subscription",
 	};
 	return labels[model] ?? model;
 }
@@ -81,7 +79,7 @@ export default function ProjectsPage() {
 	const [addPrice, setAddPrice] = useState("0.1");
 	const [addPaymentAddress, setAddPaymentAddress] = useState("");
 	const [addPricingModel, setAddPricingModel] =
-		useState<PricingModel>("one_time");
+		useState<PricingModel>("per_device");
 
 	const fetchProjects = useCallback(async () => {
 		if (!walletAddress) {
@@ -138,7 +136,7 @@ export default function ProjectsPage() {
 				setAddName("");
 				setAddPrice("0.1");
 				setAddPaymentAddress("");
-				setAddPricingModel("one_time");
+				setAddPricingModel("per_device");
 				router.push(`/projects/${project.id}`);
 				return;
 			}
