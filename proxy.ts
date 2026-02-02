@@ -35,7 +35,7 @@ function getWalletConnectionStatus(cookieHeader: string | null): boolean {
 	}
 }
 
-const protectedPaths = ["/billing", "/dashboard", "/projects"];
+const protectedPaths = ["/dashboard", "/projects", "/logs"];
 
 export function proxy(request: NextRequest) {
 	const { pathname } = request.nextUrl;
@@ -63,14 +63,14 @@ export const config = {
 	// and cause the wallet button to stay in a loading/reconnecting state
 	matcher: [
 		{
-			source: "/billing/:path*",
+			source: "/dashboard/:path*",
 			missing: [
 				{ type: "header", key: "next-router-prefetch" },
 				{ type: "header", key: "purpose", value: "prefetch" },
 			],
 		},
 		{
-			source: "/dashboard/:path*",
+			source: "/logs/:path*",
 			missing: [
 				{ type: "header", key: "next-router-prefetch" },
 				{ type: "header", key: "purpose", value: "prefetch" },

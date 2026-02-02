@@ -3,12 +3,12 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import ConnectButton from "./connect-btn";
-import { LayoutDashboard, FolderKanban, CreditCard } from "lucide-react";
+import { LayoutDashboard, FolderKanban, ScrollText } from "lucide-react";
 
 const links = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/projects", label: "Projects", icon: FolderKanban },
-  { href: "/billing", label: "Billing", icon: CreditCard },
+  { href: "/logs", label: "Logs", icon: ScrollText },
 ];
 
 export function Sidebar() {
