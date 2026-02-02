@@ -3,7 +3,7 @@ import { Geist, Geist_Mono, Noto_Sans } from "next/font/google";
 import "./globals.css";
 import ContextProvider from "@/context";
 import { headers } from "next/headers";
-import { Sidebar } from "@/components/common/sidebar";
+import { LayoutShell } from "@/components/common/layout-shell";
 
 const notoSans = Noto_Sans({
 	variable: "--font-sans",
@@ -38,10 +38,7 @@ export default async function RootLayout({
 				className={`${geistSans.variable} ${geistMono.variable} antialiased`}
 			>
 				<ContextProvider cookies={cookies}>
-					<div className="flex h-screen min-h-screen">
-						<Sidebar />
-						<main className="min-h-0 flex-1 overflow-auto">{children}</main>
-					</div>
+					<LayoutShell>{children}</LayoutShell>
 				</ContextProvider>
 			</body>
 		</html>

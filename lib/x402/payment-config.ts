@@ -1,0 +1,31 @@
+/**
+ * x402 payment facilitator URL from env.
+ * Used for on-chain payment verification (e.g. transaction hash).
+ */
+export function facilitatorUrl(): string | undefined {
+	const url = process.env.X402_FACILITATOR_URL;
+	if (!url || typeof url !== "string") return undefined;
+	const trimmed = url.trim();
+	return trimmed.length > 0 ? trimmed.replace(/\/$/, "") : undefined;
+}
+
+/** Base Sepolia chain ID. */
+export const BASE_SEPOLIA_CHAIN_ID = 84532;
+
+/** Chain ID for payment URIs (EIP-681). Default Base Sepolia (84532). */
+export function paymentChainId(): number {
+	const raw = process.env.NEXT_PUBLIC_PAYMENT_CHAIN_ID ?? process.env.PAYMENT_CHAIN_ID;
+	if (raw == null || raw === "") return BASE_SEPOLIA_CHAIN_ID;
+	const n = Number(raw);
+	return Number.isInteger(n) && n > 0 ? n : BASE_SEPOLIA_CHAIN_ID;
+}
+
+/** USDC on Base Sepolia (Circle test token). 6 decimals. */
+export const BASE_SEPOLIA_USDC_ADDRESS =
+	process.env.NEXT_PUBLIC_PAYMENT_TOKEN_ADDRESS ?? "0x036CbD53842c5426634e7929541eC2318f3dCF7e";
+
+/** Token decimals for payment (USDC = 6). */
+export const PAYMENT_TOKEN_DECIMALS = 6;
+
+/** Token symbol for display. */
+export const PAYMENT_TOKEN_SYMBOL = "USDC";

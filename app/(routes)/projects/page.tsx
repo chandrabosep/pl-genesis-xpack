@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { PricingModel } from "@/types/constants";
 import type { ProjectSummary } from "@/types/projects";
 import { ProjectForm } from "@/components/projects/project-form";
@@ -68,6 +69,7 @@ function CopyButton({
 }
 
 export default function ProjectsPage() {
+	const router = useRouter();
 	const walletAddress = useWalletAddress();
 	const [projects, setProjects] = useState<ProjectSummary[]>([]);
 	const [loading, setLoading] = useState(true);
@@ -131,12 +133,13 @@ export default function ProjectsPage() {
 				}),
 			});
 			if (res.ok) {
+				const project = await res.json();
 				setAddOpen(false);
 				setAddName("");
-				setAddPrice("10");
+				setAddPrice("0.1");
 				setAddPaymentAddress("");
 				setAddPricingModel("one_time");
-				void fetchProjects();
+				router.push(`/projects/${project.id}`);
 				return;
 			}
 			const data = await res.json();

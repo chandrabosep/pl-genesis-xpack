@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { useWalletAddress } from "@/lib/auth/use-wallet-address";
 import { PricingModel } from "@/types/constants";
 import type { ProjectSummary } from "@/types/projects";
@@ -443,6 +444,7 @@ function CreatePackageButton(props: {
   onCreated: () => void;
   variant?: "default" | "inline";
 }) {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState("");
@@ -470,12 +472,14 @@ function CreatePackageButton(props: {
         }),
       });
       if (res.ok) {
+        const project = await res.json();
         setOpen(false);
         setName("");
-        setPrice("10");
+        setPrice("0.1");
         setPaymentAddress("");
         setPricingModel("one_time");
         props.onCreated();
+        router.push(`/projects/${project.id}`);
         return;
       }
       const data = await res.json();
