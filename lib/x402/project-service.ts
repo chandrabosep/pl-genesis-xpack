@@ -122,3 +122,64 @@ export async function rotateApiKey(projectId: string, walletAddress: string) {
 
 	return { id: newKey.id, value: newKey.value };
 }
+
+export async function updateProject(
+	projectId: string,
+	paymentAddress: string,
+	walletAddress: string
+) {
+	const normalized = walletAddress.toLowerCase();
+
+	const developer = await prisma.developer.findUnique({
+		where: { walletAddress: normalized },
+	});
+
+	if (!developer) {
+		throw new Error("Developer not found");
+	}
+
+	const project = await prisma.project.findFirst({
+		where: { id: projectId, developerId: developer.id },
+	});
+
+	if (!project) {
+		throw new Error("Project not found");
+	}
+
+	await prisma.project.update({
+		where: { id: projectId },
+		data: { paymentAddress },
+	});
+
+	return { id: projectId, paymentAddress };
+}
+
+export async function deleteProject(projectId: string, walletAddress: string) {
+	const normalized = walletAddress.toLowerCase();
+
+	const developer = await prisma.developer.findUnique({
+		where: { walletAddress: normalized },
+	});
+
+	if (!developer) {
+		throw new Error("Developer not found");
+	}
+
+	const project = await prisma.project.findFirst({
+		where: { id: projectId, developerId: developer.id },
+	});
+
+	if (!project) {
+		throw new Error("Project not found");
+	}
+
+	await prisma.apiKey.deleteMany({ where: { projectId } });
+	await prisma.pricingRule.deleteMany({ where: { projectId } });
+	await prisma.receipt.deleteMany({ where: { projectId } });
+	await prisma.entitlement.deleteMany({ where: { projectId } });
+	await prisma.device.deleteMany({ where: { projectId } });
+	await prisma.installAttempt.deleteMany({ where: { projectId } });
+	await prisma.project.delete({ where: { id: projectId } });
+
+	return { id: projectId };
+}

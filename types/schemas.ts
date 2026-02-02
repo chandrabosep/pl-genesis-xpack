@@ -19,8 +19,14 @@ export const projectRotateSchema = z.object({
 	projectId: z.string().min(1),
 });
 
+export const projectUpdateSchema = z.object({
+	projectId: z.string().min(1),
+	paymentAddress: z.string().min(1),
+});
+
 export type ProjectCreateInput = z.infer<typeof projectCreateSchema>;
 export type ProjectRotateInput = z.infer<typeof projectRotateSchema>;
+export type ProjectUpdateInput = z.infer<typeof projectUpdateSchema>;
 
 export const billingSchema = z.object({
 	projectId: z.string().min(1),
