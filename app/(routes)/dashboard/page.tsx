@@ -29,6 +29,14 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
+import {
   Plus,
   KeyRound,
   Pencil,
@@ -36,13 +44,38 @@ import {
   Copy,
   Loader2,
   Package,
+  FolderKanban,
+  Download,
+  DollarSign,
+  ExternalLink,
 } from "lucide-react";
+
+type DashboardStats = {
+  activeProjects: number;
+  installs: number;
+  totalPayments: number;
+};
+
+function pricingModelLabel(model: PricingModel): string {
+  const labels: Record<PricingModel, string> = {
+    one_time: "One-time",
+    subscription: "Subscription",
+    per_device: "Per device",
+    per_version: "Per version",
+  };
+  return labels[model] ?? model;
+}
 
 export default function DashboardPage() {
   const walletAddress = useWalletAddress();
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
+  const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [statsLoading, setStatsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [filterProjectId, setFilterProjectId] = useState<string>("");
+  const [filterDateFrom, setFilterDateFrom] = useState<string>("");
+  const [filterDateTo, setFilterDateTo] = useState<string>("");
 
   const fetchProjects = useCallback(async () => {
     if (!walletAddress) {
@@ -70,9 +103,49 @@ export default function DashboardPage() {
     }
   }, [walletAddress]);
 
+  const fetchStats = useCallback(async () => {
+    if (!walletAddress) {
+      setStats(null);
+      setStatsLoading(false);
+      return;
+    }
+    setStatsLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (filterProjectId) params.set("projectId", filterProjectId);
+      if (filterDateFrom) params.set("dateFrom", filterDateFrom);
+      if (filterDateTo) params.set("dateTo", filterDateTo);
+      const res = await fetch(`/api/dashboard/stats?${params}`, {
+        headers: { "x-wallet-address": walletAddress },
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error ?? "Failed to load stats");
+      }
+      const data = await res.json();
+      setStats(data);
+    } catch {
+      setStats({ activeProjects: 0, installs: 0, totalPayments: 0 });
+    } finally {
+      setStatsLoading(false);
+    }
+  }, [walletAddress, filterProjectId, filterDateFrom, filterDateTo]);
+
   useEffect(() => {
     fetchProjects();
   }, [fetchProjects]);
+
+  useEffect(() => {
+    fetchStats();
+  }, [fetchStats]);
+
+  const clearFilters = () => {
+    setFilterProjectId("");
+    setFilterDateFrom("");
+    setFilterDateTo("");
+  };
+
+  const hasActiveFilters = filterProjectId || filterDateFrom || filterDateTo;
 
   if (!walletAddress) {
     return (
@@ -81,9 +154,9 @@ export default function DashboardPage() {
           <div className="mx-auto w-12 h-12 rounded-full bg-muted flex items-center justify-center">
             <Package className="size-6 text-muted-foreground" />
           </div>
-          <h1 className="text-xl font-semibold">API Dashboard</h1>
+          <h1 className="text-xl font-semibold">Dashboard</h1>
           <p className="text-sm text-muted-foreground">
-            Connect your wallet to view and manage your packages and API keys.
+            Connect your wallet to view analytics and manage your packages.
           </p>
         </div>
       </main>
@@ -91,19 +164,116 @@ export default function DashboardPage() {
   }
 
   return (
-    <main className="p-6 max-w-5xl mx-auto space-y-8">
+    <main className="p-6 space-y-8">
       <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">API Dashboard</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Manage packages and API keys for your integrations.
+            How is my monetization doing at a glance?
           </p>
         </div>
         <CreatePackageButton
           walletAddress={walletAddress}
-          onCreated={fetchProjects}
+          onCreated={() => {
+            fetchProjects();
+            fetchStats();
+          }}
         />
       </header>
+
+      {/* Stats cards */}
+      <section className="grid gap-4 sm:grid-cols-3">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Active projects
+            </CardTitle>
+            <FolderKanban className="size-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            {statsLoading ? (
+              <Loader2 className="size-6 animate-spin text-muted-foreground" />
+            ) : (
+              <span className="text-2xl font-semibold">
+                {stats?.activeProjects ?? 0}
+              </span>
+            )}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Successful installs
+            </CardTitle>
+            <Download className="size-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            {statsLoading ? (
+              <Loader2 className="size-6 animate-spin text-muted-foreground" />
+            ) : (
+              <span className="text-2xl font-semibold">
+                {stats?.installs ?? 0}
+              </span>
+            )}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Total revenue
+            </CardTitle>
+            <DollarSign className="size-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            {statsLoading ? (
+              <Loader2 className="size-6 animate-spin text-muted-foreground" />
+            ) : (
+              <span className="text-2xl font-semibold">
+                {(stats?.totalPayments ?? 0).toLocaleString()} USDC
+              </span>
+            )}
+          </CardContent>
+        </Card>
+      </section>
+
+      {/* Filters */}
+      <section className="flex flex-wrap items-center gap-3 py-2">
+        <Select
+          value={filterProjectId || "all"}
+          onValueChange={(v) => setFilterProjectId(v === "all" ? "" : v)}
+        >
+          <SelectTrigger id="filter-project" className="h-8 w-[160px] border-muted-foreground/20">
+            <SelectValue placeholder="All projects" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All projects</SelectItem>
+            {projects.map((p) => (
+              <SelectItem key={p.id} value={p.id}>
+                {p.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <span className="text-muted-foreground/50">|</span>
+        <DateRangePicker
+          dateFrom={filterDateFrom}
+          dateTo={filterDateTo}
+          onRangeChange={(from, to) => {
+            setFilterDateFrom(from);
+            setFilterDateTo(to);
+          }}
+          placeholder="dd/mm/yyyy"
+        />
+        {hasActiveFilters ? (
+          <button
+            type="button"
+            onClick={clearFilters}
+            className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Clear
+          </button>
+        ) : null}
+      </section>
 
       {error ? (
         <div
@@ -131,25 +301,124 @@ export default function DashboardPage() {
             </p>
             <CreatePackageButton
               walletAddress={walletAddress}
-              onCreated={fetchProjects}
+              onCreated={() => {
+                fetchProjects();
+                fetchStats();
+              }}
               variant="inline"
             />
           </div>
         ) : (
-          <ul className="grid gap-4 sm:grid-cols-2 list-none p-0 m-0">
-            {projects.map((project) => (
-              <li key={project.id}>
-                <PackageCard
-                  project={project}
-                  walletAddress={walletAddress}
-                  onUpdated={fetchProjects}
-                />
-              </li>
-            ))}
-          </ul>
+          <Card>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b bg-muted/30">
+                    <th className="text-left font-medium py-3 px-4">Package name</th>
+                    <th className="text-left font-medium py-3 px-4">Pricing model</th>
+                    <th className="text-left font-medium py-3 px-4">Price</th>
+                    <th className="text-left font-medium py-3 px-4">Status</th>
+                    <th className="text-right font-medium py-3 px-4">Quick actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {projects.map((project) => (
+                    <PackageRow
+                      key={project.id}
+                      project={project}
+                      walletAddress={walletAddress}
+                      onUpdated={() => {
+                        fetchProjects();
+                        fetchStats();
+                      }}
+                      pricingModelLabel={pricingModelLabel(project.pricingModel)}
+                    />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
         )}
       </section>
     </main>
+  );
+}
+
+function PackageRow(props: {
+  project: ProjectSummary;
+  walletAddress: string;
+  onUpdated: () => void;
+  pricingModelLabel: string;
+}) {
+  const { project, walletAddress, onUpdated, pricingModelLabel } = props;
+  const [copied, setCopied] = useState(false);
+  const [viewOpen, setViewOpen] = useState(false);
+
+  const copyKey = () => {
+    if (project.apiKeyValue) {
+      void navigator.clipboard.writeText(project.apiKeyValue);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  return (
+    <>
+      <tr className="border-b last:border-0 hover:bg-muted/20 transition-colors">
+        <td className="py-3 px-4 font-medium">{project.name}</td>
+        <td className="py-3 px-4 text-muted-foreground">{pricingModelLabel}</td>
+        <td className="py-3 px-4">{project.price ?? 0} USDC</td>
+        <td className="py-3 px-4">
+          <Badge variant="secondary" className="text-xs font-normal">
+            Active
+          </Badge>
+        </td>
+        <td className="py-3 px-4 text-right">
+          <div className="flex items-center justify-end gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={copyKey}
+              className="h-8 text-muted-foreground hover:text-foreground"
+            >
+              {copied ? (
+                "Copied"
+              ) : (
+                <>
+                  <Copy className="size-3.5" />
+                  Copy API key
+                </>
+              )}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setViewOpen(true)}
+              className="h-8 text-muted-foreground hover:text-foreground"
+            >
+              <ExternalLink className="size-3.5" />
+              View project
+            </Button>
+          </div>
+        </td>
+      </tr>
+      <Dialog open={viewOpen} onOpenChange={setViewOpen}>
+        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{project.name}</DialogTitle>
+          </DialogHeader>
+          <PackageCard
+            project={project}
+            walletAddress={walletAddress}
+            onUpdated={() => {
+              onUpdated();
+              setViewOpen(false);
+            }}
+            embedded
+          />
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
@@ -239,7 +508,9 @@ function CreatePackageButton(props: {
           onPricingChange={setPricingModel}
           onSubmit={handleSubmit}
         />
-        {message ? (
+        {submitting ? (
+          <p className="text-sm text-muted-foreground">Creating…</p>
+        ) : message ? (
           <p className="text-sm text-destructive">{message}</p>
         ) : null}
       </DialogContent>
@@ -251,8 +522,9 @@ function PackageCard(props: {
   project: ProjectSummary;
   walletAddress: string;
   onUpdated: () => void;
+  embedded?: boolean;
 }) {
-  const { project, walletAddress, onUpdated } = props;
+  const { project, walletAddress, onUpdated, embedded = false } = props;
   const [rotateOpen, setRotateOpen] = useState(false);
   const [removeOpen, setRemoveOpen] = useState(false);
   const [updateAddressOpen, setUpdateAddressOpen] = useState(false);
@@ -339,18 +611,27 @@ function PackageCard(props: {
     }
   };
 
-  return (
+  const content = (
     <>
-      <Card className="flex flex-col h-full">
-          <CardHeader className="flex flex-row items-start justify-between gap-2 pb-2">
-            <CardTitle className="text-base font-medium leading-tight">
-              {project.name}
-            </CardTitle>
-            <Badge variant="secondary" className="shrink-0 text-xs font-normal">
-              {project.pricingModel}
-            </Badge>
-          </CardHeader>
-          <CardContent className="flex-1 space-y-3">
+      {!embedded && (
+        <CardHeader className="flex flex-row items-start justify-between gap-2 pb-2">
+          <CardTitle className="text-base font-medium leading-tight">
+            {project.name}
+          </CardTitle>
+          <Badge variant="secondary" className="shrink-0 text-xs font-normal">
+            {project.pricingModel}
+          </Badge>
+        </CardHeader>
+      )}
+      <CardContent className={embedded ? "pt-0 space-y-3" : "flex-1 space-y-3"}>
+        {embedded && (
+          <div className="text-xs text-muted-foreground">
+            <span className="font-medium text-foreground">Pricing:</span>{" "}
+            {pricingModelLabel(project.pricingModel)} · {project.price ?? 0} USDC
+          </div>
+        )}
+        {!embedded && (
+          <>
             <div className="text-xs text-muted-foreground">
               <span className="font-medium text-foreground">Price:</span>{" "}
               {project.price ?? 0} USDC
@@ -359,68 +640,85 @@ function PackageCard(props: {
               <span className="font-medium text-foreground">Payment address:</span>{" "}
               <span className="break-all font-mono">{project.paymentAddress}</span>
             </div>
-            {project.apiKeyValue ? (
-              <div className="rounded-md border bg-muted/50 p-3">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs font-medium text-muted-foreground">
-                    API key
-                  </span>
-                  <Button
-                    variant="ghost"
-                    size="xs"
-                    onClick={copyKey}
-                    className="shrink-0 h-6"
-                  >
-                    {copied ? (
-                      "Copied"
-                    ) : (
-                      <>
-                        <Copy className="size-3.5" />
-                        Copy
-                      </>
-                    )}
-                  </Button>
-                </div>
-                <code className="mt-1 block truncate text-xs font-mono text-foreground">
-                  {project.apiKeyValue}
-                </code>
-                <p className="mt-1 text-[10px] text-muted-foreground">
-                  Project ID: {project.id}
-                </p>
-              </div>
-            ) : null}
-          </CardContent>
-          <CardFooter className="flex flex-wrap gap-2 border-t pt-4">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setUpdateAddressValue(project.paymentAddress);
-                setUpdateAddressOpen(true);
-              }}
-            >
-              <Pencil className="size-3.5" />
-              Update address
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setRotateOpen(true)}
-            >
-              <KeyRound className="size-3.5" />
-              Rotate key
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-              onClick={() => setRemoveOpen(true)}
-            >
-              <Trash2 className="size-3.5" />
-              Remove
-            </Button>
-          </CardFooter>
-      </Card>
+          </>
+        )}
+        {embedded && (
+          <div className="text-xs text-muted-foreground">
+            <span className="font-medium text-foreground">Payment address:</span>{" "}
+            <span className="break-all font-mono">{project.paymentAddress}</span>
+          </div>
+        )}
+        {project.apiKeyValue ? (
+          <div className="rounded-md border bg-muted/50 p-3">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs font-medium text-muted-foreground">
+                API key
+              </span>
+              <Button
+                variant="ghost"
+                size="xs"
+                onClick={copyKey}
+                className="shrink-0 h-6"
+              >
+                {copied ? (
+                  "Copied"
+                ) : (
+                  <>
+                    <Copy className="size-3.5" />
+                    Copy
+                  </>
+                )}
+              </Button>
+            </div>
+            <code className="mt-1 block truncate text-xs font-mono text-foreground">
+              {project.apiKeyValue}
+            </code>
+            <p className="mt-1 text-[10px] text-muted-foreground">
+              Project ID: {project.id}
+            </p>
+          </div>
+        ) : null}
+      </CardContent>
+      <CardFooter className="flex flex-wrap gap-2 border-t pt-4">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            setUpdateAddressValue(project.paymentAddress);
+            setUpdateAddressOpen(true);
+          }}
+        >
+          <Pencil className="size-3.5" />
+          Update address
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setRotateOpen(true)}
+        >
+          <KeyRound className="size-3.5" />
+          Rotate key
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+          onClick={() => setRemoveOpen(true)}
+        >
+          <Trash2 className="size-3.5" />
+          Remove
+        </Button>
+      </CardFooter>
+    </>
+  );
+
+  return (
+    <>
+      {embedded ? (
+        <div className="space-y-0">{content}</div>
+      ) : (
+        <Card className="flex flex-col h-full">{content}</Card>
+      )}
 
       <AlertDialog open={rotateOpen} onOpenChange={setRotateOpen}>
         <AlertDialogContent className="max-w-sm">
