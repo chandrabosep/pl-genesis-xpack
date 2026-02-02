@@ -76,7 +76,7 @@ export default function ProjectsPage() {
 	const [addSubmitting, setAddSubmitting] = useState(false);
 	const [addMessage, setAddMessage] = useState("");
 	const [addName, setAddName] = useState("");
-	const [addPrice, setAddPrice] = useState("10");
+	const [addPrice, setAddPrice] = useState("0.1");
 	const [addPaymentAddress, setAddPaymentAddress] = useState("");
 	const [addPricingModel, setAddPricingModel] =
 		useState<PricingModel>("one_time");

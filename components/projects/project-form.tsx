@@ -36,12 +36,13 @@ export function ProjectForm(props: {
 				/>
 			</div>
 			<div className="flex flex-col gap-1">
-				<label className="text-sm font-medium">Price</label>
+				<label className="text-sm font-medium">Price (USDC)</label>
 				<input
 					className="rounded border px-3 py-2"
 					type="number"
 					min="0"
-					step="1"
+					step="0.01"
+					placeholder="e.g. 0.1, 1, 10"
 					value={props.price}
 					onChange={(event) =>
 						props.onPriceChange(event.target.value)
@@ -50,9 +51,7 @@ export function ProjectForm(props: {
 				/>
 			</div>
 			<div className="flex flex-col gap-1">
-				<label className="text-sm font-medium">
-					Payment address (Base USDC)
-				</label>
+				<label className="text-sm font-medium">Payment address</label>
 				<input
 					className="rounded border px-3 py-2"
 					value={props.paymentAddress}
@@ -127,7 +126,8 @@ export function ProjectList(props: {
 								</p>
 								{project.apiKeyValue ? (
 									<p className="text-xs text-neutral-700 break-all font-mono">
-										PAYGATE_API_KEY=&quot;{project.apiKeyValue}&quot;
+										PAYGATE_API_KEY=&quot;
+										{project.apiKeyValue}&quot;
 									</p>
 								) : null}
 							</div>

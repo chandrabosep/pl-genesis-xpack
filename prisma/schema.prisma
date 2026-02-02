@@ -60,7 +60,7 @@ model PricingRule {
   project   Project @relation(fields: [projectId], references: [id])
   projectId String
   model     String // Pricing model string
-  amount    Int // Cost/amount designated by rule
+  amount    Float // Cost/amount designated by rule (supports 0.1, 0.2, etc.)
 }
 
 model Receipt {
@@ -68,7 +68,7 @@ model Receipt {
   project   Project  @relation(fields: [projectId], references: [id])
   projectId String
   token     String   @unique // Unique payment token
-  amount    Int // Amount paid
+  amount    Float // Amount paid (supports 0.1, 0.2, etc.)
   createdAt DateTime @default(now()) // When payment was made
 }
 

@@ -192,7 +192,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             {statsLoading ? (
-              <Loader2 className="size-6 animate-spin text-muted-foreground" />
+              <div className="h-8 w-20 bg-muted rounded animate-pulse" />
             ) : (
               <span className="text-2xl font-semibold">
                 {stats?.activeProjects ?? 0}
@@ -209,7 +209,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             {statsLoading ? (
-              <Loader2 className="size-6 animate-spin text-muted-foreground" />
+              <div className="h-8 w-20 bg-muted rounded animate-pulse" />
             ) : (
               <span className="text-2xl font-semibold">
                 {stats?.installs ?? 0}
@@ -226,7 +226,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             {statsLoading ? (
-              <Loader2 className="size-6 animate-spin text-muted-foreground" />
+                <div className="h-8 w-20 bg-muted rounded animate-pulse" />
             ) : (
               <span className="text-2xl font-semibold">
                 {(stats?.totalPayments ?? 0).toLocaleString()} USDC
@@ -287,8 +287,24 @@ export default function DashboardPage() {
       <section>
         <h2 className="text-sm font-medium text-muted-foreground mb-3">Packages</h2>
         {loading ? (
-          <div className="flex items-center justify-center py-16">
-            <Loader2 className="size-8 animate-spin text-muted-foreground" />
+          <div className="flex items-center justify-center border border-border rounded-lg p-4">
+            <div className="flex flex-col gap-3 w-full">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="animate-pulse flex items-center gap-4 px-4 py-3 border-b last:border-b-0"
+                >
+                  <div className="h-8 w-8 rounded bg-muted" />
+                  <div className="flex-1">
+                    <div className="h-4 w-1/3 bg-muted rounded mb-2"></div>
+                    <div className="h-3 w-1/4 bg-muted rounded"></div>
+                  </div>
+                  <div className="h-6 w-16 bg-muted rounded" />
+                  <div className="h-6 w-12 bg-muted rounded" />
+                  <div className="h-6 w-20 bg-muted rounded ml-auto" />
+                </div>
+              ))}
+            </div>
           </div>
         ) : projects.length === 0 ? (
           <div className="rounded-lg border border-dashed bg-muted/30 py-16 text-center">
@@ -431,7 +447,7 @@ function CreatePackageButton(props: {
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState("");
   const [name, setName] = useState("");
-  const [price, setPrice] = useState("10");
+  const [price, setPrice] = useState("0.1");
   const [paymentAddress, setPaymentAddress] = useState("");
   const [pricingModel, setPricingModel] = useState<PricingModel>("one_time");
 
@@ -791,7 +807,7 @@ function PackageCard(props: {
           </DialogHeader>
           <form onSubmit={handleUpdateAddress} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="payment-address">Payment address (Base USDC)</Label>
+              <Label htmlFor="payment-address">Payment address</Label>
               <Input
                 id="payment-address"
                 value={updateAddressValue}
