@@ -7,4 +7,5 @@ export interface ProjectSummary {
 	paymentAddress: string;
 	price: number | null;
 	apiKeyValue: string | null;
+	createdAt: string;
 }

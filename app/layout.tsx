@@ -35,9 +35,9 @@ export default async function RootLayout({
 				className={`${geistSans.variable} ${geistMono.variable} antialiased`}
 			>
 				<ContextProvider cookies={cookies}>
-					<div className="flex min-h-screen">
+					<div className="flex h-screen min-h-screen">
 						<Sidebar />
-						<div className="flex-1 overflow-auto">{children}</div>
+						<main className="min-h-0 flex-1 overflow-auto">{children}</main>
 					</div>
 				</ContextProvider>
 			</body>

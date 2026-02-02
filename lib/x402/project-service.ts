@@ -33,7 +33,51 @@ export async function listProjects(walletAddress: string): Promise<ProjectSummar
 		paymentAddress: p.paymentAddress,
 		price: p.pricingRules[0]?.amount ?? null,
 		apiKeyValue: p.apiKeys[0]?.value ?? null,
+		createdAt: p.createdAt.toISOString(),
 	}));
+}
+
+export async function getProjectById(
+	projectId: string,
+	walletAddress: string
+): Promise<ProjectSummary | null> {
+	const normalized = walletAddress.toLowerCase();
+
+	const developer = await prisma.developer.findUnique({
+		where: { walletAddress: normalized },
+	});
+
+	if (!developer) {
+		return null;
+	}
+
+	const project = await prisma.project.findFirst({
+		where: { id: projectId, developerId: developer.id },
+		include: {
+			apiKeys: {
+				orderBy: { createdAt: "desc" },
+				take: 1,
+			},
+			pricingRules: {
+				orderBy: { id: "asc" },
+				take: 1,
+			},
+		},
+	});
+
+	if (!project) {
+		return null;
+	}
+
+	return {
+		id: project.id,
+		name: project.name,
+		pricingModel: project.pricingModel as PricingModel,
+		paymentAddress: project.paymentAddress,
+		price: project.pricingRules[0]?.amount ?? null,
+		apiKeyValue: project.apiKeys[0]?.value ?? null,
+		createdAt: project.createdAt.toISOString(),
+	};
 }
 
 export async function createProject(
