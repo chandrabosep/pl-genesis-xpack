@@ -7,8 +7,15 @@ import { base, baseSepolia } from "@reown/appkit/networks";
 import React, { type ReactNode } from "react";
 import { cookieToInitialState, WagmiProvider, type Config } from "wagmi";
 
-// Set up queryClient
-const queryClient = new QueryClient();
+// Set up queryClient with shared refetch policy
+const queryClient = new QueryClient({
+	defaultOptions: {
+		queries: {
+			staleTime: 60 * 1000, // 1 minute
+			refetchOnWindowFocus: true,
+		},
+	},
+});
 
 if (!projectId) {
 	throw new Error("Project ID is not defined");

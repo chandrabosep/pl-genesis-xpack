@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
 import { useWalletAddress } from "@/lib/auth/use-wallet-address";
 import type { ProjectSummary } from "@/types/projects";
 import type { InstallLogEntry } from "@/types/logs";
 import { EVENT_TYPE_LABELS } from "@/types/logs";
+import { useProjectsQuery } from "@/controllers/projects.query";
+import { useLogsInfiniteQuery } from "@/controllers/logs.query";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -17,77 +18,30 @@ import {
 } from "@/components/ui/select";
 import { Package, ScrollText, Loader2 } from "lucide-react";
 import { format } from "date-fns";
+import { useState } from "react";
 
 export default function LogsPage() {
 	const walletAddress = useWalletAddress();
-	const [projects, setProjects] = useState<ProjectSummary[]>([]);
-	const [logs, setLogs] = useState<InstallLogEntry[]>([]);
-	const [loading, setLoading] = useState(true);
-	const [loadingMore, setLoadingMore] = useState(false);
-	const [error, setError] = useState<string | null>(null);
 	const [projectId, setProjectId] = useState<string>("");
-	const [nextCursor, setNextCursor] = useState<string | null>(null);
 
-	const fetchProjects = useCallback(async () => {
-		if (!walletAddress) return;
-		try {
-			const res = await fetch("/api/projects", {
-				headers: { "x-wallet-address": walletAddress },
-			});
-			if (res.ok) {
-				const data = await res.json();
-				setProjects(data.projects ?? []);
-			}
-		} catch {
-			// ignore
-		}
-	}, [walletAddress]);
+	const { data: projectsData } = useProjectsQuery(walletAddress ?? undefined);
+	const projects: ProjectSummary[] = projectsData?.projects ?? [];
 
-	const fetchLogs = useCallback(
-		async (cursor?: string, append = false) => {
-			if (!walletAddress) {
-				setLogs([]);
-				setLoading(false);
-				return;
-			}
-			if (!append) setLoading(true);
-			else setLoadingMore(true);
-			setError(null);
-			try {
-				const params = new URLSearchParams();
-				if (projectId) params.set("projectId", projectId);
-				if (cursor) params.set("cursor", cursor);
-				params.set("limit", "30");
-				const res = await fetch(`/api/logs?${params}`, {
-					headers: { "x-wallet-address": walletAddress },
-				});
-				const data = await res.json();
-				if (!res.ok) throw new Error(data.error ?? "Failed to load logs");
-				const newLogs = data.logs ?? [];
-				setLogs((prev) => (append ? [...prev, ...newLogs] : newLogs));
-				setNextCursor(data.nextCursor ?? null);
-			} catch (e) {
-				setError((e as Error).message);
-				if (!append) setLogs([]);
-			} finally {
-				setLoading(false);
-				setLoadingMore(false);
-			}
-		},
-		[walletAddress, projectId],
-	);
+	const {
+		data,
+		isLoading: loading,
+		error: logsError,
+		fetchNextPage,
+		hasNextPage,
+		isFetchingNextPage,
+	} = useLogsInfiniteQuery(walletAddress ?? undefined, {
+		projectId: projectId || undefined,
+		limit: 30,
+	});
 
-	useEffect(() => {
-		fetchProjects();
-	}, [fetchProjects]);
-
-	useEffect(() => {
-		fetchLogs();
-	}, [fetchLogs]);
-
-	const loadMore = () => {
-		if (nextCursor && !loadingMore) fetchLogs(nextCursor, true);
-	};
+	const pages = data?.pages ?? [];
+	const logs: InstallLogEntry[] = pages.flatMap((p) => p.logs);
+	const error = logsError?.message ?? null;
 
 	if (!walletAddress) {
 		return (
@@ -205,15 +159,15 @@ export default function LogsPage() {
 						</table>
 					)}
 				</div>
-				{nextCursor && logs.length > 0 ? (
+				{hasNextPage && logs.length > 0 ? (
 					<div className="border-t px-4 py-3 flex justify-center">
 						<Button
 							variant="outline"
 							size="sm"
-							onClick={loadMore}
-							disabled={loadingMore}
+							onClick={() => fetchNextPage()}
+							disabled={isFetchingNextPage}
 						>
-							{loadingMore ? (
+							{isFetchingNextPage ? (
 								<>
 									<Loader2 className="size-4 animate-spin" />
 									Loading…

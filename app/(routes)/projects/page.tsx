@@ -1,13 +1,16 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { PricingModel } from "@/types/constants";
 import type { ProjectSummary } from "@/types/projects";
 import { ProjectForm } from "@/components/projects/project-form";
 import { useWalletAddress } from "@/lib/auth/use-wallet-address";
-import { shortenAddress, formatDate } from "@/lib/utils";
+import { shortenAddress, formatDate, pricingModelLabel } from "@/lib/utils";
+import { CopyButton } from "@/components/ui/copy-button";
+import { useProjectsQuery } from "@/controllers/projects.query";
+import { useCreateProjectMutation } from "@/controllers/projects.mutations";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -17,63 +20,12 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
-import { Copy, ChevronRight, Loader2, Package, Plus } from "lucide-react";
-
-function pricingModelLabel(model: PricingModel): string {
-	const labels: Record<PricingModel, string> = {
-		per_device: "Per device",
-		subscription: "Subscription",
-	};
-	return labels[model] ?? model;
-}
-
-function CopyButton({
-	value,
-	label = "Copy",
-	className,
-}: {
-	value: string;
-	label?: string;
-	className?: string;
-}) {
-	const [copied, setCopied] = useState(false);
-	const copy = (e: React.MouseEvent) => {
-		e.preventDefault();
-		e.stopPropagation();
-		void navigator.clipboard.writeText(value).then(() => {
-			setCopied(true);
-			setTimeout(() => setCopied(false), 2000);
-		});
-	};
-	return (
-		<Button
-			type="button"
-			variant="outline"
-			size="xs"
-			className={className}
-			onClick={copy}
-			aria-label={label}
-		>
-			{copied ? (
-				<span className="text-green-600">Copied!</span>
-			) : (
-				<>
-					<Copy className="size-3" />
-					Copy
-				</>
-			)}
-		</Button>
-	);
-}
+import { ChevronRight, Package, Plus } from "lucide-react";
 
 export default function ProjectsPage() {
 	const router = useRouter();
 	const walletAddress = useWalletAddress();
-	const [projects, setProjects] = useState<ProjectSummary[]>([]);
-	const [loading, setLoading] = useState(true);
-	const [error, setError] = useState<string | null>(null);
 	const [addOpen, setAddOpen] = useState(false);
-	const [addSubmitting, setAddSubmitting] = useState(false);
 	const [addMessage, setAddMessage] = useState("");
 	const [addName, setAddName] = useState("");
 	const [addPrice, setAddPrice] = useState("0.1");
@@ -81,70 +33,39 @@ export default function ProjectsPage() {
 	const [addPricingModel, setAddPricingModel] =
 		useState<PricingModel>("per_device");
 
-	const fetchProjects = useCallback(async () => {
-		if (!walletAddress) {
-			setProjects([]);
-			setLoading(false);
-			return;
-		}
-		setLoading(true);
-		setError(null);
-		try {
-			const res = await fetch("/api/projects", {
-				headers: { "x-wallet-address": walletAddress },
-			});
-			if (!res.ok) {
-				const data = await res.json();
-				throw new Error(data.error ?? "Failed to load projects");
-			}
-			const data = await res.json();
-			setProjects(data.projects ?? []);
-		} catch (e) {
-			setError((e as Error).message);
-			setProjects([]);
-		} finally {
-			setLoading(false);
-		}
-	}, [walletAddress]);
+	const {
+		data: projectsData,
+		isLoading: loading,
+		error: projectsError,
+	} = useProjectsQuery(walletAddress ?? undefined);
 
-	useEffect(() => {
-		void fetchProjects();
-	}, [fetchProjects]);
+	const createProject = useCreateProjectMutation(walletAddress ?? undefined, {
+		onSuccess: (project) => {
+			setAddOpen(false);
+			setAddName("");
+			setAddPrice("0.1");
+			setAddPaymentAddress("");
+			setAddPricingModel("per_device");
+			router.push(`/projects/${project.id}`);
+		},
+		onError: (err) => {
+			setAddMessage(err.message ?? "Unable to create project.");
+		},
+	});
+
+	const projects: ProjectSummary[] = projectsData?.projects ?? [];
+	const error = projectsError?.message ?? null;
 
 	const handleAddSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
 		e.preventDefault();
 		if (!walletAddress) return;
 		setAddMessage("");
-		setAddSubmitting(true);
-		try {
-			const res = await fetch("/api/projects", {
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-					"x-wallet-address": walletAddress,
-				},
-				body: JSON.stringify({
-					name: addName,
-					pricingModel: addPricingModel,
-					price: Number(addPrice),
-					paymentAddress: addPaymentAddress,
-				}),
-			});
-			if (res.ok) {
-				const project = await res.json();
-				setAddOpen(false);
-				setAddName("");
-				setAddPrice("0.1");
-				setAddPaymentAddress("");
-				setAddPricingModel("per_device");
-				router.push(`/projects/${project.id}`);
-				return;
-			}
-			const data = await res.json();
-			setAddMessage(data.error ?? "Unable to create project.");
-		} finally {
-			setAddSubmitting(false);
-		}
+		createProject.mutate({
+			name: addName,
+			pricingModel: addPricingModel,
+			price: Number(addPrice),
+			paymentAddress: addPaymentAddress,
+		});
 	};
 
 	return (
@@ -185,7 +106,7 @@ export default function ProjectsPage() {
 									{addMessage}
 								</p>
 							) : null}
-							{addSubmitting && (
+							{createProject.isPending && (
 								<p className="text-sm text-muted-foreground">
 									Creating…
 								</p>
@@ -296,9 +217,10 @@ export default function ProjectsPage() {
 										{project.apiKeyValue && (
 											<div
 												className="flex items-center gap-2"
-												onClick={(e) =>
-													e.preventDefault()
-												}
+												onClick={(e) => {
+													e.preventDefault();
+													e.stopPropagation();
+												}}
 											>
 												<code className="flex-1 truncate rounded bg-muted px-1.5 py-0.5 text-[11px] font-mono">
 													{shortenAddress(
@@ -310,6 +232,7 @@ export default function ProjectsPage() {
 												<CopyButton
 													value={project.apiKeyValue}
 													label="Copy API key"
+													buttonText="Copy"
 												/>
 											</div>
 										)}
