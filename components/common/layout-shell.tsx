@@ -5,7 +5,8 @@ import { Sidebar } from "./sidebar";
 
 export function LayoutShell({ children }: { children: React.ReactNode }) {
 	const pathname = usePathname();
-	const hideSidebar = pathname?.startsWith("/pay");
+	const hideSidebar =
+		pathname === "/" || pathname?.startsWith("/pay");
 
 	if (hideSidebar) {
 		return <main className="min-h-screen">{children}</main>;
