@@ -21,22 +21,23 @@ const ERC20_TRANSFER_ABI = [
 
 const BASE_SEPOLIA_CHAIN_ID = 84532;
 
+type ReadyPayload = {
+	price: number;
+	address: string;
+	projectName?: string;
+	sessionToken: string;
+	paymentUri?: string;
+	chainId?: number;
+	currency?: string;
+	tokenAddress?: string;
+	amountUnits?: string;
+};
+
 type SessionState =
 	| { status: "loading" }
 	| { status: "invalid"; error: string }
-	| {
-			status: "ready";
-			price: number;
-			address: string;
-			projectName?: string;
-			sessionToken: string;
-			paymentUri?: string;
-			chainId?: number;
-			currency?: string;
-			tokenAddress?: string;
-			amountUnits?: string;
-	  }
-	| { status: "verifying" }
+	| ({ status: "ready" } & ReadyPayload)
+	| ({ status: "verifying" } & ReadyPayload)
 	| { status: "verified" }
 	| { status: "verify_error"; error: string };
 
@@ -46,29 +47,50 @@ export default function PayPage() {
 	const [state, setState] = useState<SessionState>({ status: "loading" });
 	const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
 	const payingForSessionRef = useRef<string | null>(null);
+	const readyPayloadRef = useRef<ReadyPayload | null>(null);
 
-	const { address, isConnected, chain } = useAccount();
+	const { isConnected, chain } = useAccount();
 	const { switchChainAsync } = useSwitchChain();
 	const { open } = useAppKit();
-	const { writeContract, data: txHash, isPending: isWritePending } = useWriteContract();
+	const {
+		writeContract,
+		data: txHash,
+		isPending: isWritePending,
+	} = useWriteContract();
 
-	const paymentUri = state.status === "ready" ? state.paymentUri : undefined;
+	const paymentUri =
+		state.status === "ready" || state.status === "verifying"
+			? state.paymentUri
+			: undefined;
 	useEffect(() => {
 		if (!paymentUri) {
-			setQrDataUrl(null);
+			queueMicrotask(() => setQrDataUrl(null));
 			return;
 		}
+		let cancelled = false;
 		QRCode.toDataURL(paymentUri, { width: 256, margin: 2 })
-			.then(setQrDataUrl)
-			.catch(() => setQrDataUrl(null));
+			.then((url) => {
+				if (!cancelled) setQrDataUrl(url);
+			})
+			.catch(() => {
+				if (!cancelled) setQrDataUrl(null);
+			});
+		return () => {
+			cancelled = true;
+		};
 	}, [paymentUri]);
 
 	// Auto-verify when we get tx hash from wagmi writeContract (same session we triggered pay for)
 	useEffect(() => {
 		if (!txHash || !payingForSessionRef.current) return;
 		const sessionToken = payingForSessionRef.current;
+		const payload = readyPayloadRef.current;
 		payingForSessionRef.current = null;
-		setState((s) => (s.status === "ready" ? { ...s, status: "verifying" } : s));
+		readyPayloadRef.current = null;
+		if (!payload) return;
+		queueMicrotask(() =>
+			setState({ ...payload, status: "verifying" }),
+		);
 		fetch("/api/install/verify", {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
@@ -77,14 +99,28 @@ export default function PayPage() {
 			.then((res) => res.json())
 			.then((result) => {
 				if (result.verified) setState({ status: "verified" });
-				else setState({ status: "verify_error", error: result.error ?? "Verification failed" });
+				else
+					setState({
+						status: "verify_error",
+						error: result.error ?? "Verification failed",
+					});
 			})
-			.catch(() => setState({ status: "verify_error", error: "Verification failed" }));
+			.catch(() =>
+				setState({
+					status: "verify_error",
+					error: "Verification failed",
+				}),
+			);
 	}, [txHash]);
 
 	const handlePayWithWallet = useCallback(async () => {
 		if (state.status !== "ready") return;
-		const { address: recipient, sessionToken, tokenAddress, amountUnits } = state;
+		const {
+			address: recipient,
+			sessionToken,
+			tokenAddress,
+			amountUnits,
+		} = state;
 		if (!tokenAddress || !amountUnits) return;
 
 		if (!isConnected) {
@@ -101,6 +137,7 @@ export default function PayPage() {
 		}
 
 		payingForSessionRef.current = sessionToken;
+		readyPayloadRef.current = state;
 		writeContract({
 			address: tokenAddress as `0x${string}`,
 			abi: ERC20_TRANSFER_ABI,
@@ -112,7 +149,9 @@ export default function PayPage() {
 	const fetchSession = useCallback(async (token: string) => {
 		setState({ status: "loading" });
 		try {
-			const res = await fetch(`/api/install/session?session=${encodeURIComponent(token)}`);
+			const res = await fetch(
+				`/api/install/session?session=${encodeURIComponent(token)}`,
+			);
 			if (!res.ok) {
 				const data = await res.json().catch(() => ({}));
 				setState({
@@ -142,9 +181,14 @@ export default function PayPage() {
 
 	useEffect(() => {
 		if (sessionParam?.trim()) {
-			fetchSession(sessionParam.trim());
+			queueMicrotask(() => fetchSession(sessionParam.trim()));
 		} else {
-			setState({ status: "invalid", error: "Missing session. Use the payment link from the install flow." });
+			queueMicrotask(() =>
+				setState({
+					status: "invalid",
+					error: "Missing session. Use the payment link from the install flow.",
+				}),
+			);
 		}
 	}, [sessionParam, fetchSession]);
 
@@ -152,9 +196,11 @@ export default function PayPage() {
 		e.preventDefault();
 		if (state.status !== "ready") return;
 		const form = e.currentTarget;
-		const txHash = (form.elements.namedItem("transactionHash") as HTMLInputElement)?.value?.trim();
+		const txHash = (
+			form.elements.namedItem("transactionHash") as HTMLInputElement
+		)?.value?.trim();
 		if (!txHash) return;
-		setState({ status: "verifying" });
+		setState({ ...state, status: "verifying" });
 		try {
 			const res = await fetch("/api/install/verify", {
 				method: "POST",
@@ -195,7 +241,8 @@ export default function PayPage() {
 					{state.error}
 				</div>
 				<p className="text-sm text-muted-foreground">
-					Use the payment link provided when you ran the install (e.g. from the CLI or docs).
+					Use the payment link provided when you ran the install (e.g.
+					from the CLI or docs).
 				</p>
 			</main>
 		);
@@ -206,7 +253,8 @@ export default function PayPage() {
 			<main className="mx-auto max-w-lg space-y-6 p-6">
 				<h1 className="text-2xl font-semibold">Payment verified</h1>
 				<div className="rounded-lg border border-green-200 bg-green-50 p-4 text-green-900 dark:border-green-800 dark:bg-green-950 dark:text-green-100">
-					Payment was verified successfully. You can now re-run the install command.
+					Payment was verified successfully. You can now re-run the
+					install command.
 				</div>
 			</main>
 		);
@@ -220,7 +268,8 @@ export default function PayPage() {
 					{state.error}
 				</div>
 				<p className="text-sm text-muted-foreground">
-					Check the transaction hash and try again, or open the payment link again to get a fresh session.
+					Check the transaction hash and try again, or open the
+					payment link again to get a fresh session.
 				</p>
 				{sessionParam?.trim() && (
 					<button
@@ -235,30 +284,42 @@ export default function PayPage() {
 		);
 	}
 
-	// state.status === "ready"
-	const { price, address: recipientAddress, projectName, sessionToken } = state;
+	// state.status === "ready" | "verifying" (both have ReadyPayload)
+	if (state.status !== "ready" && state.status !== "verifying") return null;
+	const { price, address: recipientAddress, projectName } = state;
 	return (
 		<main className="mx-auto max-w-lg space-y-6 p-6">
 			<h1 className="text-2xl font-semibold">Complete payment</h1>
 			{projectName && (
 				<p className="text-muted-foreground">
-					Pay for: <span className="font-medium text-foreground">{projectName}</span>
+					Pay for:{" "}
+					<span className="font-medium text-foreground">
+						{projectName}
+					</span>
 				</p>
 			)}
 			<div className="rounded-lg border bg-card p-4 text-card-foreground">
 				<dl className="space-y-2">
 					<div>
-						<dt className="text-sm text-muted-foreground">Amount</dt>
+						<dt className="text-sm text-muted-foreground">
+							Amount
+						</dt>
 						<dd className="font-mono font-medium">
 							{price} {state.currency ?? "USDC"}
 						</dd>
 					</div>
 					<div>
-						<dt className="text-sm text-muted-foreground">Pay to address</dt>
-						<dd className="break-all font-mono text-sm">{recipientAddress}</dd>
+						<dt className="text-sm text-muted-foreground">
+							Pay to address
+						</dt>
+						<dd className="break-all font-mono text-sm">
+							{recipientAddress}
+						</dd>
 					</div>
 					<div>
-						<dt className="text-sm text-muted-foreground">Network</dt>
+						<dt className="text-sm text-muted-foreground">
+							Network
+						</dt>
 						<dd className="text-sm">Base Sepolia</dd>
 					</div>
 				</dl>
@@ -266,15 +327,23 @@ export default function PayPage() {
 
 			{paymentUri ? (
 				<div className="space-y-3">
-					<p className="text-sm font-medium">Scan or open in wallet</p>
+					<p className="text-sm font-medium">
+						Scan or open in wallet
+					</p>
 					<p className="text-sm text-muted-foreground">
-						Scan the QR code with your wallet app, or tap the link to open your wallet with the amount
-						pre-filled.
+						Scan the QR code with your wallet app, or tap the link
+						to open your wallet with the amount pre-filled.
 					</p>
 					<div className="flex flex-col items-center gap-4 sm:flex-row sm:items-start">
 						{qrDataUrl && (
 							<div className="shrink-0 rounded-lg border bg-white p-2">
-								<img src={qrDataUrl} alt="Payment QR code" width={256} height={256} />
+								{/* eslint-disable-next-line @next/next/no-img-element -- QR data URL not supported by next/image */}
+								<img
+									src={qrDataUrl}
+									alt="Payment QR code"
+									width={256}
+									height={256}
+								/>
 							</div>
 						)}
 						<div className="flex flex-col gap-2">
@@ -300,13 +369,20 @@ export default function PayPage() {
 				</div>
 			) : (
 				<p className="text-sm text-muted-foreground">
-					Send the amount above to the address, then paste the transaction hash below to verify.
+					Send the amount above to the address, then paste the
+					transaction hash below to verify.
 				</p>
 			)}
 
-			<form className="space-y-4 rounded-lg border p-4" onSubmit={handleVerify}>
+			<form
+				className="space-y-4 rounded-lg border p-4"
+				onSubmit={handleVerify}
+			>
 				<div>
-					<label htmlFor="transactionHash" className="mb-1 block text-sm font-medium">
+					<label
+						htmlFor="transactionHash"
+						className="mb-1 block text-sm font-medium"
+					>
 						Transaction hash
 					</label>
 					<input
@@ -324,7 +400,9 @@ export default function PayPage() {
 					disabled={state.status === "verifying"}
 					className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
 				>
-					{state.status === "verifying" ? "Verifying…" : "Verify payment"}
+					{state.status === "verifying"
+						? "Verifying…"
+						: "Verify payment"}
 				</button>
 			</form>
 		</main>
