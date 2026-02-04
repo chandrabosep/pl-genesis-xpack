@@ -37,12 +37,14 @@ model Project {
 }
 
 model Entitlement {
-  id        String    @id @default(cuid())
-  project   Project   @relation(fields: [projectId], references: [id])
-  projectId String
-  deviceId  String?
-  version   String?
-  expiresAt DateTime?
+  id            String    @id @default(cuid())
+  project       Project   @relation(fields: [projectId], references: [id])
+  projectId     String
+  deviceId      String?   // per_device: required; subscription: null
+  githubUserId  String?   // subscription: required; per_device: null
+  githubUsername String?  // optional display name
+  version       String?
+  expiresAt     DateTime?
 }
 
 model ApiKey {
@@ -81,12 +83,14 @@ model Device {
 }
 
 model InstallAttempt {
-  id           String   @id @default(cuid()) // Unique attempt ID
-  project      Project  @relation(fields: [projectId], references: [id])
-  projectId    String
-  deviceId     String? // Device (if known)
-  version      String // App version
-  status       String // Status (success, fail, etc.)
-  sessionToken String?  @unique // Optional install session token
-  createdAt    DateTime @default(now()) // When attempt occurred
+  id             String   @id @default(cuid()) // Unique attempt ID
+  project        Project  @relation(fields: [projectId], references: [id])
+  projectId      String
+  deviceId       String?  // per_device: set; subscription: optional
+  githubUserId   String?  // subscription: set for entitlement after payment
+  githubUsername String?
+  version        String   // App version
+  status         String   // Status (success, fail, etc.)
+  sessionToken   String?  @unique // Optional install session token
+  createdAt      DateTime @default(now()) // When attempt occurred
 }

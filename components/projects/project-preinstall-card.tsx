@@ -134,19 +134,44 @@ export function ProjectPreinstallCard({
 							<code className="rounded bg-muted px-1 py-0.5 font-mono">
 								install
 							</code>
-							):
-							<pre className="mt-1 overflow-x-auto rounded-lg border bg-muted/50 p-3 font-mono text-xs">
-								{`"preinstall": "node ./preinstall.js"`}
-							</pre>
+							) — add inside{" "}
+							<code className="rounded bg-muted px-1 py-0.5 font-mono">
+								scripts
+							</code>
+							:
+							<div className="relative mt-1">
+								<pre className="overflow-x-auto rounded-lg border bg-muted/50 p-3 pr-12 font-mono text-xs">
+									{`"scripts": {
+    ...
+    "preinstall": "node ./preinstall.js"
+  },`}
+								</pre>
+								<div className="absolute right-2 top-2">
+									<CopyButton
+										value={`"scripts": {\n    ...\n    "preinstall": "node ./preinstall.js"\n  },`}
+										label="Copy scripts snippet"
+										buttonText="Copy"
+									/>
+								</div>
+							</div>
 						</li>
 						<li>
 							<span className="font-medium text-foreground">
 								Publish only the script
 							</span>
 							:
-							<pre className="mt-1 overflow-x-auto rounded-lg border bg-muted/50 p-3 font-mono text-xs">
-								{`"files": ["preinstall.js"]`}
-							</pre>
+							<div className="relative mt-1">
+								<pre className="overflow-x-auto rounded-lg border bg-muted/50 p-3 pr-12 font-mono text-xs">
+									{`"files": ["preinstall.js"]`}
+								</pre>
+								<div className="absolute right-2 top-2">
+									<CopyButton
+										value={'"files": ["preinstall.js"]'}
+										label="Copy files snippet"
+										buttonText="Copy"
+									/>
+								</div>
+							</div>
 						</li>
 						<li>
 							<span className="font-medium text-foreground">
@@ -157,20 +182,38 @@ export function ProjectPreinstallCard({
 								fetch
 							</code>
 							):
-							<pre className="mt-1 overflow-x-auto rounded-lg border bg-muted/50 p-3 font-mono text-xs">
-								{`"engines": {
+							<div className="relative mt-1">
+								<pre className="overflow-x-auto rounded-lg border bg-muted/50 p-3 pr-12 font-mono text-xs">
+									{`"engines": {
   "node": ">=18.0.0"
 }`}
-							</pre>
+								</pre>
+								<div className="absolute right-2 top-2">
+									<CopyButton
+										value={`"engines": {\n  "node": ">=18.0.0"\n}`}
+										label="Copy engines snippet"
+										buttonText="Copy"
+									/>
+								</div>
+							</div>
 						</li>
 						<li>
 							<span className="font-medium text-foreground">
 								xpack config
 							</span>{" "}
 							(projectId and apiKey — no .env needed):
-							<pre className="mt-1 overflow-x-auto rounded-lg border bg-muted/50 p-3 font-mono text-xs">
-								{xpackConfig}
-							</pre>
+							<div className="relative mt-1">
+								<pre className="overflow-x-auto rounded-lg border bg-muted/50 p-3 pr-12 font-mono text-xs">
+									{xpackConfig}
+								</pre>
+								<div className="absolute right-2 top-2">
+									<CopyButton
+										value={xpackConfig}
+										label="Copy xpack config"
+										buttonText="Copy"
+									/>
+								</div>
+							</div>
 						</li>
 						<li>
 							<span className="font-medium text-foreground">

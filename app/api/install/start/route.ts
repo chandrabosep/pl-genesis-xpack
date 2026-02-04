@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { ZodError } from "zod";
 import { startInstall } from "@/lib/x402/install-service";
 import { installStartSchema } from "@/types/schemas";
 import { X402_HEADERS } from "@/types/constants";
@@ -10,7 +11,16 @@ const AUTH_FAILURE_REASONS = [
 
 export async function POST(request: NextRequest) {
   try {
-    const body = installStartSchema.parse(await request.json());
+    let raw: unknown;
+    try {
+      raw = await request.json();
+    } catch {
+      return NextResponse.json(
+        { error: "Invalid request: body must be JSON" },
+        { status: 400 },
+      );
+    }
+    const body = installStartSchema.parse(raw);
     const decision = await startInstall(body);
 
     if (decision.allowed) {
@@ -41,9 +51,18 @@ export async function POST(request: NextRequest) {
       { status: 402, headers },
     );
   } catch (error) {
+    if (error instanceof ZodError) {
+      const first = error.errors[0];
+      const msg = first
+        ? `${first.path.join(".")}: ${first.message}`
+        : "Validation failed";
+      return NextResponse.json({ error: `Invalid request: ${msg}` }, { status: 400 });
+    }
+    const message =
+      error instanceof Error ? error.message : "Invalid request";
     return NextResponse.json(
-      { error: "Invalid request" },
-      { status: 400 },
+      { error: message },
+      { status: 500 },
     );
   }
 }

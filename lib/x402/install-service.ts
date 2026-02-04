@@ -65,18 +65,23 @@ async function validateProjectApiKey(projectId: string, apiKey: string) {
 	return { project: key.project, apiKey: key };
 }
 
-/** Check if user is already entitled for this project/device */
+/** Check if user is already entitled: per_device by deviceId, subscription by githubUserId or githubUsername */
 async function hasEntitlement(
 	projectId: string,
 	pricingModel: PricingModel,
 	deviceId: string | undefined,
+	githubUserId: string | undefined,
+	githubUsername: string | undefined,
 ): Promise<boolean> {
-	if (pricingModel === "subscription" && deviceId) {
+	if (pricingModel === "subscription" && (githubUserId || githubUsername)) {
 		const count = await prisma.entitlement.count({
 			where: {
 				projectId,
-				deviceId,
 				expiresAt: { gt: new Date() },
+				OR: [
+					...(githubUserId ? [{ githubUserId }] : []),
+					...(githubUsername ? [{ githubUsername }] : []),
+				],
 			},
 		});
 		return count > 0;
@@ -90,14 +95,18 @@ async function hasEntitlement(
 	return false;
 }
 
-/** Build payment_required decision from project and session token */
+/** Build payment_required decision from project and session token. Optional githubUsername is appended to pay URL for pre-fill. */
 function paymentRequired(
 	project: { paymentAddress: string; pricingRules: { amount: number }[] },
-	sessionToken: string
+	sessionToken: string,
+	githubUsername?: string | null
 ): InstallDecision {
 	const price = project.pricingRules[0]?.amount ?? 0;
 	const base = paymentInstructionsBaseUrl();
-	const instructions = `${base}/pay?session=${encodeURIComponent(sessionToken)}`;
+	let instructions = `${base}/pay?session=${encodeURIComponent(sessionToken)}`;
+	if (githubUsername?.trim()) {
+		instructions += `&github=${encodeURIComponent(githubUsername.trim())}`;
+	}
 	return {
 		allowed: false,
 		reason: "Payment required to install this package",
@@ -112,7 +121,7 @@ function paymentRequired(
 
 /**
  * Start install flow: validate apiKey/projectId, check entitlement, or create attempt and return payment details.
- * Isolation: only the project that owns the apiKey is used; session is scoped to that project.
+ * Per-device: requires deviceId. Subscription: requires githubUserId (device-agnostic, keyed by GitHub identity).
  */
 export async function startInstall(body: InstallStartInput): Promise<InstallDecision> {
 	const validated = await validateProjectApiKey(body.projectId, body.apiKey);
@@ -132,12 +141,30 @@ export async function startInstall(body: InstallStartInput): Promise<InstallDeci
 	const { project } = validated;
 	const pricingModel = project.pricingModel as PricingModel;
 	const deviceId = body.deviceId ?? undefined;
+	const githubUserId = body.githubUserId ?? undefined;
+	const githubUsername = body.githubUsername ?? undefined;
 	const version = body.version ?? "0.0.0";
+
+	// Subscription: payment URL is always returned when not entitled; GitHub can be set on payment page if missing.
+	if (pricingModel === "per_device" && !deviceId) {
+		return {
+			allowed: false,
+			reason: "Device ID is required for per-device licensing",
+			payment: {
+				price: 0,
+				address: "",
+				sessionToken: "",
+				instructions: "",
+			},
+		};
+	}
 
 	const entitled = await hasEntitlement(
 		project.id,
 		pricingModel,
-		deviceId
+		deviceId,
+		githubUserId,
+		githubUsername,
 	);
 	if (entitled) return { allowed: true };
 
@@ -146,13 +173,15 @@ export async function startInstall(body: InstallStartInput): Promise<InstallDeci
 		data: {
 			projectId: project.id,
 			deviceId: deviceId ?? null,
+			githubUserId: githubUserId ?? null,
+			githubUsername: githubUsername ?? null,
 			version,
 			status: "payment_required",
 			sessionToken,
 		},
 	});
 
-	return paymentRequired(project, sessionToken);
+	return paymentRequired(project, sessionToken, githubUsername);
 }
 
 /**
@@ -179,7 +208,23 @@ export async function checkInstallStatus(
 	const { project } = validated;
 	const pricingModel = project.pricingModel as PricingModel;
 	const deviceId = body.deviceId ?? undefined;
+	const githubUserId = body.githubUserId ?? undefined;
+	const githubUsername = body.githubUsername ?? undefined;
 	const version = body.version ?? "0.0.0";
+
+	// Subscription: payment URL is always returned when not entitled; GitHub can be set on payment page if missing.
+	if (pricingModel === "per_device" && !deviceId) {
+		return {
+			allowed: false,
+			reason: "Device ID is required for per-device licensing",
+			payment: {
+				price: 0,
+				address: "",
+				sessionToken: "",
+				instructions: "",
+			},
+		};
+	}
 
 	if (body.sessionToken) {
 		const attempt = await prisma.installAttempt.findUnique({
@@ -189,14 +234,16 @@ export async function checkInstallStatus(
 		// Session must belong to this project; otherwise ignore and fall through
 		if (attempt && attempt.projectId === body.projectId) {
 			if (attempt.status === "allowed") return { allowed: true };
-			return paymentRequired(project, body.sessionToken);
+			return paymentRequired(project, body.sessionToken, githubUsername);
 		}
 	}
 
 	const entitled = await hasEntitlement(
 		project.id,
 		pricingModel,
-		deviceId
+		deviceId,
+		githubUserId,
+		githubUsername,
 	);
 	if (entitled) return { allowed: true };
 
@@ -205,13 +252,15 @@ export async function checkInstallStatus(
 		data: {
 			projectId: project.id,
 			deviceId: deviceId ?? null,
+			githubUserId: githubUserId ?? null,
+			githubUsername: githubUsername ?? null,
 			version,
 			status: "payment_required",
 			sessionToken,
 		},
 	});
 
-	return paymentRequired(project, sessionToken);
+	return paymentRequired(project, sessionToken, githubUsername);
 }
 
 /**

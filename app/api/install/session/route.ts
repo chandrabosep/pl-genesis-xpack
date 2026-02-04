@@ -30,6 +30,7 @@ export async function GET(request: NextRequest) {
 				},
 			},
 		});
+		const pricingModel = attempt?.project?.pricingModel as string | undefined;
 
 		if (!attempt) {
 			return NextResponse.json(
@@ -73,10 +74,85 @@ export async function GET(request: NextRequest) {
 			currency: PAYMENT_TOKEN_SYMBOL,
 			tokenAddress: isEthereumAddress ? BASE_SEPOLIA_USDC_ADDRESS : undefined,
 			amountUnits: amountUnits?.toString(),
+			pricingModel: pricingModel ?? undefined,
+			githubUsername: attempt.githubUsername ?? undefined,
+			githubUserId: attempt.githubUserId ?? undefined,
 		});
 	} catch {
 		return NextResponse.json(
 			{ error: "Failed to load session" },
+			{ status: 500 }
+		);
+	}
+}
+
+const GITHUB_USERNAME_REGEX = /^[a-zA-Z0-9-]+$/;
+
+/**
+ * Update install attempt with GitHub username (for subscription when not set at install time).
+ * Call from pay page when user enters their GitHub username before paying.
+ */
+export async function PATCH(request: NextRequest) {
+	try {
+		let sessionToken: string | null =
+			request.nextUrl.searchParams.get("session");
+		let body: { sessionToken?: string; githubUsername?: string } = {};
+		try {
+			body = await request.json();
+		} catch {
+			// optional body
+		}
+		sessionToken = sessionToken ?? body.sessionToken ?? null;
+		const githubUsername =
+			typeof body.githubUsername === "string"
+				? body.githubUsername.trim()
+				: "";
+
+		if (!sessionToken?.trim()) {
+			return NextResponse.json(
+				{ error: "Missing session parameter" },
+				{ status: 400 }
+			);
+		}
+		if (!githubUsername || !GITHUB_USERNAME_REGEX.test(githubUsername)) {
+			return NextResponse.json(
+				{ error: "Valid githubUsername is required (alphanumeric and hyphens)" },
+				{ status: 400 }
+			);
+		}
+
+		const attempt = await prisma.installAttempt.findUnique({
+			where: { sessionToken: sessionToken.trim() },
+			include: { project: true },
+		});
+		if (!attempt) {
+			return NextResponse.json(
+				{ error: "Unknown or expired session" },
+				{ status: 404 }
+			);
+		}
+		if (attempt.status !== "payment_required") {
+			return NextResponse.json(
+				{ error: "Session no longer requires payment" },
+				{ status: 400 }
+			);
+		}
+		if (attempt.project.pricingModel !== "subscription") {
+			return NextResponse.json(
+				{ error: "GitHub username is only used for subscription pricing" },
+				{ status: 400 }
+			);
+		}
+
+		await prisma.installAttempt.update({
+			where: { id: attempt.id },
+			data: { githubUsername },
+		});
+
+		return NextResponse.json({ githubUsername });
+	} catch {
+		return NextResponse.json(
+			{ error: "Failed to update session" },
 			{ status: 500 }
 		);
 	}

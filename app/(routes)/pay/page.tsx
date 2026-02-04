@@ -31,6 +31,9 @@ type ReadyPayload = {
 	currency?: string;
 	tokenAddress?: string;
 	amountUnits?: string;
+	pricingModel?: string;
+	githubUsername?: string;
+	githubUserId?: string;
 };
 
 type SessionState =
@@ -48,6 +51,11 @@ export default function PayPage() {
 	const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
 	const payingForSessionRef = useRef<string | null>(null);
 	const readyPayloadRef = useRef<ReadyPayload | null>(null);
+	// For subscription: GitHub username when missing from session (user enters on pay page)
+	const [githubUsername, setGithubUsername] = useState("");
+	const [githubSaved, setGithubSaved] = useState(false);
+	const [githubSaving, setGithubSaving] = useState(false);
+	const [githubError, setGithubError] = useState<string | null>(null);
 
 	const { isConnected, chain } = useAccount();
 	const { switchChainAsync } = useSwitchChain();
@@ -148,6 +156,9 @@ export default function PayPage() {
 
 	const fetchSession = useCallback(async (token: string) => {
 		setState({ status: "loading" });
+		setGithubUsername("");
+		setGithubSaved(false);
+		setGithubError(null);
 		try {
 			const res = await fetch(
 				`/api/install/session?session=${encodeURIComponent(token)}`,
@@ -161,6 +172,12 @@ export default function PayPage() {
 				return;
 			}
 			const data = await res.json();
+			// Pre-fill GitHub from session or from URL (?github=)
+			const fromUrl = searchParams.get("github")?.trim() ?? "";
+			const fromSession = data.githubUsername?.trim() ?? "";
+			const initial = fromSession || fromUrl;
+			setGithubUsername(initial);
+			setGithubSaved(!!fromSession);
 			payingForSessionRef.current = null;
 			setState({
 				status: "ready",
@@ -173,11 +190,14 @@ export default function PayPage() {
 				currency: data.currency,
 				tokenAddress: data.tokenAddress,
 				amountUnits: data.amountUnits,
+				pricingModel: data.pricingModel,
+				githubUsername: data.githubUsername,
+				githubUserId: data.githubUserId,
 			});
 		} catch {
 			setState({ status: "invalid", error: "Failed to load session" });
 		}
-	}, []);
+	}, [searchParams]);
 
 	useEffect(() => {
 		if (sessionParam?.trim()) {
@@ -191,6 +211,38 @@ export default function PayPage() {
 			);
 		}
 	}, [sessionParam, fetchSession]);
+
+	const saveGithubUsername = useCallback(async () => {
+		if (state.status !== "ready") return;
+		const username = githubUsername.trim();
+		if (!username || !/^[a-zA-Z0-9-]+$/.test(username)) {
+			setGithubError("Enter a valid GitHub username (letters, numbers, hyphens only)");
+			return;
+		}
+		setGithubError(null);
+		setGithubSaving(true);
+		try {
+			const res = await fetch("/api/install/session", {
+				method: "PATCH",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					sessionToken: state.sessionToken,
+					githubUsername: username,
+				}),
+			});
+			const data = await res.json().catch(() => ({}));
+			if (res.ok) {
+				setGithubSaved(true);
+				setState({ ...state, githubUsername: username });
+			} else {
+				setGithubError(data.error ?? "Failed to save GitHub username");
+			}
+		} catch {
+			setGithubError("Failed to save GitHub username");
+		} finally {
+			setGithubSaving(false);
+		}
+	}, [state, githubUsername]);
 
 	const handleVerify = async (e: React.FormEvent<HTMLFormElement>) => {
 		e.preventDefault();
@@ -287,6 +339,11 @@ export default function PayPage() {
 	// state.status === "ready" | "verifying" (both have ReadyPayload)
 	if (state.status !== "ready" && state.status !== "verifying") return null;
 	const { price, address: recipientAddress, projectName } = state;
+	const isSubscription = state.pricingModel === "subscription";
+	const hasGithub =
+		!!state.githubUsername || githubSaved;
+	const subscriptionNeedsGithub = isSubscription && !hasGithub;
+
 	return (
 		<main className="mx-auto max-w-lg space-y-6 p-6">
 			<h1 className="text-2xl font-semibold">Complete payment</h1>
@@ -296,6 +353,56 @@ export default function PayPage() {
 					<span className="font-medium text-foreground">
 						{projectName}
 					</span>
+				</p>
+			)}
+			{isSubscription && (
+				<p className="text-sm text-muted-foreground">
+					Subscription is tied to your GitHub identity. After payment you can install from any machine with the same GitHub user.
+				</p>
+			)}
+			{subscriptionNeedsGithub && (
+				<div className="space-y-2 rounded-lg border bg-muted/30 p-4">
+					<label
+						htmlFor="githubUsername"
+						className="block text-sm font-medium"
+					>
+						GitHub username (required for subscription)
+					</label>
+					<div className="flex gap-2">
+						<input
+							id="githubUsername"
+							type="text"
+							value={githubUsername}
+							onChange={(e) => {
+								setGithubUsername(e.target.value);
+								setGithubError(null);
+							}}
+							placeholder="your-github-username"
+							className="flex-1 rounded-md border bg-background px-3 py-2 font-mono text-sm"
+							disabled={githubSaving || githubSaved}
+						/>
+						<button
+							type="button"
+							onClick={saveGithubUsername}
+							disabled={githubSaving || githubSaved || !githubUsername.trim()}
+							className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+						>
+							{githubSaved ? "Saved" : githubSaving ? "Saving…" : "Save"}
+						</button>
+					</div>
+					{githubError && (
+						<p className="text-sm text-destructive">{githubError}</p>
+					)}
+					{!githubSaved && (
+						<p className="text-xs text-muted-foreground">
+							Save your GitHub username before paying so we can link this subscription to your account.
+						</p>
+					)}
+				</div>
+			)}
+			{isSubscription && hasGithub && (
+				<p className="text-sm text-muted-foreground">
+					Subscribing as: <span className="font-mono font-medium">{state.githubUsername || githubUsername}</span>
 				</p>
 			)}
 			<div className="rounded-lg border bg-card p-4 text-card-foreground">
@@ -350,7 +457,7 @@ export default function PayPage() {
 							<button
 								type="button"
 								onClick={handlePayWithWallet}
-								disabled={isWritePending}
+								disabled={isWritePending || subscriptionNeedsGithub}
 								className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-3 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
 							>
 								{!isConnected
@@ -376,7 +483,13 @@ export default function PayPage() {
 
 			<form
 				className="space-y-4 rounded-lg border p-4"
-				onSubmit={handleVerify}
+				onSubmit={(e) => {
+					if (subscriptionNeedsGithub) {
+						e.preventDefault();
+						return;
+					}
+					handleVerify(e);
+				}}
 			>
 				<div>
 					<label
@@ -397,13 +510,18 @@ export default function PayPage() {
 				</div>
 				<button
 					type="submit"
-					disabled={state.status === "verifying"}
+					disabled={state.status === "verifying" || subscriptionNeedsGithub}
 					className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
 				>
 					{state.status === "verifying"
 						? "Verifying…"
 						: "Verify payment"}
 				</button>
+				{subscriptionNeedsGithub && (
+					<p className="text-xs text-muted-foreground">
+						Save your GitHub username above before verifying payment.
+					</p>
+				)}
 			</form>
 		</main>
 	);

@@ -49,8 +49,10 @@ export async function linkReceiptToEntitlement(
 
 	const entitlementData = buildEntitlementData(
 		pricingModel,
+		project.id,
 		attempt.deviceId,
-		project.id
+		attempt.githubUserId,
+		attempt.githubUsername,
 	);
 
 	if (entitlementData) {
@@ -65,18 +67,24 @@ export async function linkReceiptToEntitlement(
 
 function buildEntitlementData(
 	pricingModel: PricingModel,
+	projectId: string,
 	deviceId: string | null | undefined,
-	projectId: string
+	githubUserId: string | null | undefined,
+	githubUsername: string | null | undefined,
 ) {
 	if (pricingModel === "subscription") {
-		if (!deviceId) {
-			throw new Error("Device is required for subscription entitlements");
+		if (!githubUserId && !githubUsername) {
+			throw new Error(
+				"GitHub identity (userId or username) is required for subscription entitlements (from install attempt)",
+			);
 		}
 		return {
 			projectId,
-			deviceId,
+			deviceId: null,
+			githubUserId: githubUserId ?? null,
+			githubUsername: githubUsername ?? null,
 			expiresAt: new Date(
-				Date.now() + SUBSCRIPTION_DAYS * 24 * 60 * 60 * 1000
+				Date.now() + SUBSCRIPTION_DAYS * 24 * 60 * 60 * 1000,
 			),
 		};
 	}
@@ -84,7 +92,12 @@ function buildEntitlementData(
 		if (!deviceId) {
 			throw new Error("Device is required for per_device entitlements");
 		}
-		return { projectId, deviceId };
+		return {
+			projectId,
+			deviceId,
+			githubUserId: null,
+			githubUsername: null,
+		};
 	}
 	return null;
 }
