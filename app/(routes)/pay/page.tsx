@@ -64,6 +64,9 @@ export default function PayPage() {
 		writeContract,
 		data: txHash,
 		isPending: isWritePending,
+		error: writeError,
+		isError: isWriteError,
+		reset: resetWriteContract,
 	} = useWriteContract();
 
 	const paymentUri =
@@ -146,13 +149,14 @@ export default function PayPage() {
 
 		payingForSessionRef.current = sessionToken;
 		readyPayloadRef.current = state;
+		resetWriteContract?.(); // clear previous payment-failed state when retrying
 		writeContract({
 			address: tokenAddress as `0x${string}`,
 			abi: ERC20_TRANSFER_ABI,
 			functionName: "transfer",
 			args: [recipient as `0x${string}`, BigInt(amountUnits)],
 		});
-	}, [state, isConnected, chain?.id, switchChainAsync, open, writeContract]);
+	}, [state, isConnected, chain?.id, switchChainAsync, open, writeContract, resetWriteContract]);
 
 	const fetchSession = useCallback(async (token: string) => {
 		setState({ status: "loading" });
@@ -404,6 +408,14 @@ export default function PayPage() {
 				<p className="text-sm text-muted-foreground">
 					Subscribing as: <span className="font-mono font-medium">{state.githubUsername || githubUsername}</span>
 				</p>
+			)}
+			{state.status === "ready" && isWriteError && (
+				<div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-destructive">
+					<p className="font-medium">Payment failed</p>
+					<p className="mt-1 text-sm">
+						{writeError?.message ?? "Transaction was rejected or failed. Check your balance and try again."}
+					</p>
+				</div>
 			)}
 			<div className="rounded-lg border bg-card p-4 text-card-foreground">
 				<dl className="space-y-2">
