@@ -3,7 +3,12 @@
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import QRCode from "qrcode";
-import { useAccount, useSwitchChain, useWriteContract } from "wagmi";
+import {
+	useAccount,
+	useSwitchChain,
+	useWaitForTransactionReceipt,
+	useWriteContract,
+} from "wagmi";
 import { useAppKit } from "@reown/appkit/react";
 
 const ERC20_TRANSFER_ABI = [
@@ -40,7 +45,8 @@ type SessionState =
 	| { status: "loading" }
 	| { status: "invalid"; error: string }
 	| ({ status: "ready" } & ReadyPayload)
-	| ({ status: "verifying" } & ReadyPayload)
+	| ({ status: "confirming" } & ReadyPayload) // tx submitted, waiting for block
+	| ({ status: "verifying" } & ReadyPayload)  // tx mined, checking on our server
 	| { status: "verified" }
 	| { status: "verify_error"; error: string };
 
@@ -69,8 +75,14 @@ export default function PayPage() {
 		reset: resetWriteContract,
 	} = useWriteContract();
 
+	// Wait for tx to be mined before we call verify (avoids "Transaction not found")
+	const { data: receipt, isSuccess: isReceiptSuccess } =
+		useWaitForTransactionReceipt({ hash: txHash ?? undefined });
+
 	const paymentUri =
-		state.status === "ready" || state.status === "verifying"
+		state.status === "ready" ||
+		state.status === "confirming" ||
+		state.status === "verifying"
 			? state.paymentUri
 			: undefined;
 	useEffect(() => {
@@ -91,9 +103,21 @@ export default function PayPage() {
 		};
 	}, [paymentUri]);
 
-	// Auto-verify when we get tx hash from wagmi writeContract (same session we triggered pay for)
+	// When tx is submitted, show "Confirming…" (waiting for block)
 	useEffect(() => {
 		if (!txHash || !payingForSessionRef.current) return;
+		const payload = readyPayloadRef.current;
+		if (!payload) return;
+		// Only set confirming if we're still in ready (avoid overwriting verifying/verified)
+		setState((s) =>
+			s.status === "ready" ? { ...payload, status: "confirming" } : s,
+		);
+	}, [txHash]);
+
+	// Auto-verify only after tx is mined (receipt exists) so our server finds the receipt
+	useEffect(() => {
+		if (!isReceiptSuccess || !receipt || !txHash || !payingForSessionRef.current)
+			return;
 		const sessionToken = payingForSessionRef.current;
 		const payload = readyPayloadRef.current;
 		payingForSessionRef.current = null;
@@ -122,7 +146,7 @@ export default function PayPage() {
 					error: "Verification failed",
 				}),
 			);
-	}, [txHash]);
+	}, [isReceiptSuccess, receipt, txHash]);
 
 	const handlePayWithWallet = useCallback(async () => {
 		if (state.status !== "ready") return;
@@ -340,8 +364,13 @@ export default function PayPage() {
 		);
 	}
 
-	// state.status === "ready" | "verifying" (both have ReadyPayload)
-	if (state.status !== "ready" && state.status !== "verifying") return null;
+	// state.status === "ready" | "confirming" | "verifying" (all have ReadyPayload)
+	if (
+		state.status !== "ready" &&
+		state.status !== "confirming" &&
+		state.status !== "verifying"
+	)
+		return null;
 	const { price, address: recipientAddress, projectName } = state;
 	const isSubscription = state.pricingModel === "subscription";
 	const hasGithub =
@@ -493,6 +522,13 @@ export default function PayPage() {
 				</p>
 			)}
 
+			{(state.status === "confirming" || state.status === "verifying") && (
+				<p className="text-sm text-muted-foreground">
+					{state.status === "confirming"
+						? "Waiting for transaction to be confirmed on chain…"
+						: "Checking that payment reached our address on chain…"}
+				</p>
+			)}
 			<form
 				className="space-y-4 rounded-lg border p-4"
 				onSubmit={(e) => {
@@ -522,12 +558,18 @@ export default function PayPage() {
 				</div>
 				<button
 					type="submit"
-					disabled={state.status === "verifying" || subscriptionNeedsGithub}
+					disabled={
+						state.status === "confirming" ||
+						state.status === "verifying" ||
+						subscriptionNeedsGithub
+					}
 					className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
 				>
-					{state.status === "verifying"
-						? "Verifying…"
-						: "Verify payment"}
+					{state.status === "confirming"
+						? "Confirming…"
+						: state.status === "verifying"
+							? "Verifying…"
+							: "Verify payment"}
 				</button>
 				{subscriptionNeedsGithub && (
 					<p className="text-xs text-muted-foreground">
