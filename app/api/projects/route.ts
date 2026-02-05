@@ -44,13 +44,18 @@ export async function PATCH(request: NextRequest) {
   try {
     const walletAddress = requireWalletAddressFromHeaders(request);
     const body = await request.json();
-    if (body.paymentAddress != null) {
+    const hasUpdate =
+      body.paymentAddress != null ||
+      body.receiveMode != null ||
+      body.unifiedReceiveAddress !== undefined;
+    if (hasUpdate) {
       const parsed = projectUpdateSchema.parse(body);
-      const result = await updateProject(
-        parsed.projectId,
-        parsed.paymentAddress,
-        walletAddress,
-      );
+      const updates: Parameters<typeof updateProject>[1] = {};
+      if (parsed.paymentAddress != null) updates.paymentAddress = parsed.paymentAddress;
+      if (parsed.receiveMode != null) updates.receiveMode = parsed.receiveMode;
+      if (parsed.unifiedReceiveAddress !== undefined)
+        updates.unifiedReceiveAddress = parsed.unifiedReceiveAddress?.trim() || null;
+      const result = await updateProject(parsed.projectId, updates, walletAddress);
       return NextResponse.json(result);
     }
     const parsed = projectRotateSchema.parse(body);

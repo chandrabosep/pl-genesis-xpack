@@ -8,4 +8,6 @@ export interface ProjectSummary {
 	price: number | null;
 	apiKeyValue: string | null;
 	createdAt: string;
+	receiveMode?: string | null;
+	unifiedReceiveAddress?: string | null;
 }

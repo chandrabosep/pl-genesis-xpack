@@ -21,12 +21,14 @@ model Developer {
 }
 
 model Project {
-  id              String           @id @default(cuid()) // Project unique identifier
-  name            String // Project name (provided by user)
-  pricingModel    String // Pricing model chosen
-  paymentAddress  String // Payment receiving address
-  developer       Developer        @relation(fields: [developerId], references: [id])
-  developerId     String
+  id                     String           @id @default(cuid()) // Project unique identifier
+  name                   String // Project name (provided by user)
+  pricingModel          String // Pricing model chosen
+  paymentAddress        String // Payment receiving address (used when receiveMode is base)
+  receiveMode           String?  @default("base") // "base" = Base only; "any_chain" = accept USDC on Base + Arc, receive at unifiedReceiveAddress
+  unifiedReceiveAddress String? // When receiveMode is any_chain: address that receives funds on any chain
+  developer              Developer        @relation(fields: [developerId], references: [id])
+  developerId            String
   pricingRules    PricingRule[] // Project's pricing rules
   receipts        Receipt[] // Associated payment receipts
   devices         Device[] // Devices registered to project

@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/select";
 
 const pricingOptions: PricingModel[] = ["per_device", "subscription"];
+type ReceiveMode = "base" | "any_chain";
 
 function pricingOptionLabel(model: PricingModel): string {
 	const labels: Record<PricingModel, string> = {
@@ -25,12 +26,20 @@ export function ProjectForm(props: {
 	price: string;
 	paymentAddress: string;
 	pricingModel: PricingModel;
+	receiveMode?: ReceiveMode;
+	unifiedReceiveAddress?: string;
 	onNameChange: (value: string) => void;
 	onPriceChange: (value: string) => void;
 	onPaymentAddressChange: (value: string) => void;
 	onPricingChange: (value: PricingModel) => void;
+	onReceiveModeChange?: (value: ReceiveMode) => void;
+	onUnifiedReceiveAddressChange?: (value: string) => void;
 	onSubmit: (event: React.FormEvent<HTMLFormElement>) => Promise<void>;
 }) {
+	const receiveMode = props.receiveMode ?? "base";
+	const unifiedReceiveAddress = props.unifiedReceiveAddress ?? "";
+	const isAnyChain = receiveMode === "any_chain";
+
 	return (
 		<form
 			className="space-y-3 rounded border p-4"
@@ -60,16 +69,56 @@ export function ProjectForm(props: {
 					required
 				/>
 			</div>
+			<div className="flex flex-col gap-2">
+				<label className="text-sm font-medium">Receive payments on</label>
+				<div className="flex gap-3">
+					<label className="flex items-center gap-2">
+						<input
+							type="radio"
+							name="receiveMode"
+							checked={receiveMode === "base"}
+							onChange={() => props.onReceiveModeChange?.("base")}
+							className="rounded border-gray-300"
+						/>
+						<span className="text-sm">Base only</span>
+					</label>
+					<label className="flex items-center gap-2">
+						<input
+							type="radio"
+							name="receiveMode"
+							checked={receiveMode === "any_chain"}
+							onChange={() => props.onReceiveModeChange?.("any_chain")}
+							className="rounded border-gray-300"
+						/>
+						<span className="text-sm">Any chain (Base + Arc)</span>
+					</label>
+				</div>
+				<p className="text-xs text-muted-foreground">
+					{receiveMode === "base"
+						? "Users pay USDC on Base Sepolia to your payment address."
+						: "Users can pay USDC on Base Sepolia or Arc; funds go to your selected address."}
+				</p>
+			</div>
 			<div className="flex flex-col gap-1">
-				<label className="text-sm font-medium">Payment address</label>
+				<label className="text-sm font-medium">
+					{receiveMode === "base" ? "Payment address (Base Sepolia)" : "Receive address (Base + Arc)"}
+				</label>
 				<input
-					className="rounded border px-3 py-2"
-					value={props.paymentAddress}
-					onChange={(event) =>
-						props.onPaymentAddressChange(event.target.value)
-					}
+					className="rounded border px-3 py-2 font-mono text-sm"
+					value={receiveMode === "base" ? props.paymentAddress : unifiedReceiveAddress || props.paymentAddress}
+					onChange={(event) => {
+						const v = event.target.value;
+						props.onPaymentAddressChange(v);
+						if (isAnyChain) props.onUnifiedReceiveAddressChange?.(v);
+					}}
+					placeholder="0x…"
 					required
 				/>
+				{isAnyChain && (
+					<p className="text-xs text-muted-foreground">
+						Same address receives USDC when users pay on Base Sepolia or Arc.
+					</p>
+				)}
 			</div>
 			<div className="flex flex-col gap-1">
 				<label className="text-sm font-medium">Pricing model</label>

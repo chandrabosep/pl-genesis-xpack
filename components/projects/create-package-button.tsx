@@ -30,6 +30,8 @@ export function CreatePackageButton({
 	const [price, setPrice] = useState("0.1");
 	const [paymentAddress, setPaymentAddress] = useState("");
 	const [pricingModel, setPricingModel] = useState<PricingModel>("per_device");
+	const [receiveMode, setReceiveMode] = useState<"base" | "any_chain">("base");
+	const [unifiedReceiveAddress, setUnifiedReceiveAddress] = useState("");
 
 	const createProject = useCreateProjectMutation(walletAddress, {
 		onSuccess: (project) => {
@@ -38,6 +40,8 @@ export function CreatePackageButton({
 			setPrice("0.1");
 			setPaymentAddress("");
 			setPricingModel("per_device");
+			setReceiveMode("base");
+			setUnifiedReceiveAddress("");
 			onCreated();
 			router.push(`/projects/${project.id}`);
 		},
@@ -49,11 +53,14 @@ export function CreatePackageButton({
 	const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
 		e.preventDefault();
 		setMessage("");
+		const address = receiveMode === "any_chain" ? unifiedReceiveAddress.trim() || paymentAddress : paymentAddress;
 		createProject.mutate({
 			name,
 			pricingModel,
 			price: Number(price),
-			paymentAddress,
+			paymentAddress: address,
+			receiveMode,
+			unifiedReceiveAddress: receiveMode === "any_chain" ? address : undefined,
 		});
 	};
 
@@ -90,10 +97,17 @@ export function CreatePackageButton({
 					price={price}
 					paymentAddress={paymentAddress}
 					pricingModel={pricingModel}
+					receiveMode={receiveMode}
+					unifiedReceiveAddress={unifiedReceiveAddress}
 					onNameChange={setName}
 					onPriceChange={setPrice}
 					onPaymentAddressChange={setPaymentAddress}
 					onPricingChange={setPricingModel}
+					onReceiveModeChange={(mode) => {
+						setReceiveMode(mode);
+						if (mode === "any_chain" && !unifiedReceiveAddress) setUnifiedReceiveAddress(paymentAddress);
+					}}
+					onUnifiedReceiveAddressChange={setUnifiedReceiveAddress}
 					onSubmit={handleSubmit}
 				/>
 				{createProject.isPending ? (

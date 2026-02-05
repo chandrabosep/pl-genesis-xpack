@@ -65,6 +65,7 @@ export default function ProjectsPage() {
 			pricingModel: addPricingModel,
 			price: Number(addPrice),
 			paymentAddress: addPaymentAddress,
+			receiveMode: "base",
 		});
 	};
 

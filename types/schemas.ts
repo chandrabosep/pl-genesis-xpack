@@ -6,21 +6,39 @@ const pricingModelSchema = z.enum([
 	"subscription",
 ] as const satisfies readonly PricingModel[]);
 
-export const projectCreateSchema = z.object({
-	name: z.string().min(1),
-	pricingModel: pricingModelSchema,
-	price: z.number().min(0),
-	paymentAddress: z.string().min(1),
-});
+export const receiveModeSchema = z.enum(["base", "any_chain"]);
+
+export const projectCreateSchema = z
+	.object({
+		name: z.string().min(1),
+		pricingModel: pricingModelSchema,
+		price: z.number().min(0),
+		paymentAddress: z.string().min(1),
+		receiveMode: receiveModeSchema.optional().default("base"),
+		unifiedReceiveAddress: z.string().min(1).optional(),
+	})
+	.refine(
+		(data) =>
+			data.receiveMode !== "any_chain" || (data.unifiedReceiveAddress?.trim().length ?? 0) > 0,
+		{ message: "unifiedReceiveAddress is required when receiveMode is any_chain", path: ["unifiedReceiveAddress"] },
+	);
 
 export const projectRotateSchema = z.object({
 	projectId: z.string().min(1),
 });
 
-export const projectUpdateSchema = z.object({
-	projectId: z.string().min(1),
-	paymentAddress: z.string().min(1),
-});
+export const projectUpdateSchema = z
+	.object({
+		projectId: z.string().min(1),
+		paymentAddress: z.string().min(1).optional(),
+		receiveMode: receiveModeSchema.optional(),
+		unifiedReceiveAddress: z.string().min(1).optional(),
+	})
+	.refine(
+		(data) =>
+			data.receiveMode !== "any_chain" || (data.unifiedReceiveAddress?.trim().length ?? 0) > 0,
+		{ message: "unifiedReceiveAddress is required when receiveMode is any_chain", path: ["unifiedReceiveAddress"] },
+	);
 
 export type ProjectCreateInput = z.infer<typeof projectCreateSchema>;
 export type ProjectRotateInput = z.infer<typeof projectRotateSchema>;
@@ -72,9 +90,10 @@ export const installConfirmSchema = z.object({
 });
 export type InstallConfirmInput = z.infer<typeof installConfirmSchema>;
 
-/** Verify payment: sessionToken + transactionHash from client */
+/** Verify payment: sessionToken + transactionHash from client; chainId for multi-chain (default Base Sepolia). */
 export const installVerifySchema = z.object({
 	sessionToken: z.string().min(1).max(256),
 	transactionHash: z.string().min(1).max(132),
+	chainId: z.number().int().positive().optional(),
 });
 export type InstallVerifyInput = z.infer<typeof installVerifySchema>;

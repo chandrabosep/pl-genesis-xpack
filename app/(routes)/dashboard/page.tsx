@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useWalletAddress } from "@/lib/auth/use-wallet-address";
 import type { ProjectSummary } from "@/types/projects";
 import { CreatePackageButton } from "@/components/projects/create-package-button";
@@ -26,6 +26,7 @@ import {
 	FolderKanban,
 	Download,
 	DollarSign,
+	Wallet,
 } from "lucide-react";
 
 export default function DashboardPage() {
@@ -33,6 +34,15 @@ export default function DashboardPage() {
 	const [filterProjectId, setFilterProjectId] = useState<string>("");
 	const [filterDateFrom, setFilterDateFrom] = useState<string>("");
 	const [filterDateTo, setFilterDateTo] = useState<string>("");
+	const [circleWalletsCount, setCircleWalletsCount] = useState<number | null>(null);
+	useEffect(() => {
+		fetch("/api/circle/wallets/balances?blockchain=BASE-SEPOLIA")
+			.then((r) => (r.ok ? r.json() : null))
+			.then((data: { wallets?: unknown[] } | null) =>
+				setCircleWalletsCount(data?.wallets?.length ?? null),
+			)
+			.catch(() => setCircleWalletsCount(null));
+	}, []);
 
 	const {
 		data: projectsData,
@@ -151,6 +161,28 @@ export default function DashboardPage() {
 								{(stats?.totalPayments ?? 0).toLocaleString()} USDC
 							</span>
 						)}
+					</CardContent>
+				</Card>
+				<Card>
+					<CardHeader className="flex flex-row items-center justify-between pb-2">
+						<CardTitle className="text-sm font-medium text-muted-foreground">
+							Circle Wallets
+						</CardTitle>
+						<Wallet className="size-4 text-muted-foreground" />
+					</CardHeader>
+					<CardContent>
+						{circleWalletsCount === null ? (
+							<span className="text-sm text-muted-foreground">
+								—
+							</span>
+						) : (
+							<span className="text-2xl font-semibold">
+								{circleWalletsCount} wallet{circleWalletsCount !== 1 ? "s" : ""}
+							</span>
+						)}
+						<p className="mt-1 text-xs text-muted-foreground">
+							Programmable Wallets (API)
+						</p>
 					</CardContent>
 				</Card>
 			</section>

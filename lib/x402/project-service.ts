@@ -34,6 +34,8 @@ export async function listProjects(walletAddress: string): Promise<ProjectSummar
 		price: p.pricingRules[0]?.amount ?? null,
 		apiKeyValue: p.apiKeys[0]?.value ?? null,
 		createdAt: p.createdAt.toISOString(),
+		receiveMode: p.receiveMode ?? null,
+		unifiedReceiveAddress: p.unifiedReceiveAddress ?? null,
 	}));
 }
 
@@ -77,6 +79,8 @@ export async function getProjectById(
 		price: project.pricingRules[0]?.amount ?? null,
 		apiKeyValue: project.apiKeys[0]?.value ?? null,
 		createdAt: project.createdAt.toISOString(),
+		receiveMode: project.receiveMode ?? null,
+		unifiedReceiveAddress: project.unifiedReceiveAddress ?? null,
 	};
 }
 
@@ -97,6 +101,8 @@ export async function createProject(
 			name: body.name,
 			pricingModel: body.pricingModel,
 			paymentAddress: body.paymentAddress,
+			receiveMode: body.receiveMode ?? "base",
+			unifiedReceiveAddress: body.unifiedReceiveAddress?.trim() || null,
 			developerId: developer.id,
 		},
 	});
@@ -167,9 +173,15 @@ export async function rotateApiKey(projectId: string, walletAddress: string) {
 	return { id: newKey.id, value: newKey.value };
 }
 
+export type UpdateProjectParams = {
+	paymentAddress?: string;
+	receiveMode?: "base" | "any_chain";
+	unifiedReceiveAddress?: string | null;
+};
+
 export async function updateProject(
 	projectId: string,
-	paymentAddress: string,
+	updates: UpdateProjectParams,
 	walletAddress: string
 ) {
 	const normalized = walletAddress.toLowerCase();
@@ -190,12 +202,17 @@ export async function updateProject(
 		throw new Error("Project not found");
 	}
 
+	const data: { paymentAddress?: string; receiveMode?: string; unifiedReceiveAddress?: string | null } = {};
+	if (updates.paymentAddress !== undefined) data.paymentAddress = updates.paymentAddress;
+	if (updates.receiveMode !== undefined) data.receiveMode = updates.receiveMode;
+	if (updates.unifiedReceiveAddress !== undefined) data.unifiedReceiveAddress = updates.unifiedReceiveAddress?.trim() || null;
+
 	await prisma.project.update({
 		where: { id: projectId },
-		data: { paymentAddress },
+		data,
 	});
 
-	return { id: projectId, paymentAddress };
+	return { id: projectId, ...data };
 }
 
 export async function deleteProject(projectId: string, walletAddress: string) {

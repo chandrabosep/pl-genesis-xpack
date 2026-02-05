@@ -8,8 +8,52 @@ import {
 	useSwitchChain,
 	useWaitForTransactionReceipt,
 	useWriteContract,
+	useSignTypedData,
 } from "wagmi";
 import { useAppKit } from "@reown/appkit/react";
+
+/** Circle Gateway Minter on Arc (and other EVM testnets). */
+const GATEWAY_MINTER_ADDRESS = "0x0022222ABE238Cc2C7Bb1f21003F0a260052475B" as const;
+const GATEWAY_MINTER_ABI = [
+	{
+		type: "function" as const,
+		name: "gatewayMint",
+		stateMutability: "nonpayable" as const,
+		inputs: [
+			{ name: "attestationPayload", type: "bytes" },
+			{ name: "signature", type: "bytes" },
+		],
+		outputs: [],
+	},
+] as const;
+
+/** Gateway Wallet: deposit your USDC here to get a Gateway balance. Same address on Base Sepolia and Arc. */
+const GATEWAY_WALLET_ADDRESS = "0x0077777d7EBA4688BDeF3E311b846F25870A19B9" as const;
+const GATEWAY_DEPOSIT_ABI = [
+	{
+		type: "function" as const,
+		name: "deposit",
+		stateMutability: "nonpayable" as const,
+		inputs: [
+			{ name: "token", type: "address" },
+			{ name: "value", type: "uint256" },
+		],
+		outputs: [],
+	},
+] as const;
+
+const ERC20_APPROVE_ABI = [
+	{
+		type: "function" as const,
+		name: "approve",
+		stateMutability: "nonpayable" as const,
+		inputs: [
+			{ name: "spender", type: "address" },
+			{ name: "amount", type: "uint256" },
+		],
+		outputs: [{ type: "bool" }],
+	},
+] as const;
 
 const ERC20_TRANSFER_ABI = [
 	{
@@ -25,6 +69,21 @@ const ERC20_TRANSFER_ABI = [
 ] as const;
 
 const BASE_SEPOLIA_CHAIN_ID = 84532;
+const ARC_TESTNET_CHAIN_ID = 5042002;
+
+const USDC_BY_CHAIN: Record<number, string> = {
+	[BASE_SEPOLIA_CHAIN_ID]: "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
+	[ARC_TESTNET_CHAIN_ID]: "0x3600000000000000000000000000000000000000",
+};
+const GATEWAY_DEPOSIT_AMOUNT_USDC = 2;
+const GATEWAY_DEPOSIT_AMOUNT_UNITS = BigInt(GATEWAY_DEPOSIT_AMOUNT_USDC * 1_000_000);
+
+type PaymentOption = {
+	chainId: number;
+	paymentUri: string;
+	tokenAddress: string;
+	chainName: string;
+};
 
 type ReadyPayload = {
 	price: number;
@@ -39,6 +98,8 @@ type ReadyPayload = {
 	pricingModel?: string;
 	githubUsername?: string;
 	githubUserId?: string;
+	receiveMode?: "base" | "any_chain";
+	paymentOptions?: PaymentOption[];
 };
 
 type SessionState =
@@ -62,8 +123,20 @@ export default function PayPage() {
 	const [githubSaved, setGithubSaved] = useState(false);
 	const [githubSaving, setGithubSaving] = useState(false);
 	const [githubError, setGithubError] = useState<string | null>(null);
+	// Circle Gateway flow: source chain for Gateway balance, then attestation + mint
+	const [gatewaySourceChainId, setGatewaySourceChainId] = useState(BASE_SEPOLIA_CHAIN_ID);
+	const [gatewayError, setGatewayError] = useState<string | null>(null);
+	const [gatewayStep, setGatewayStep] = useState<"idle" | "loading" | "sign" | "request" | "mint">("idle");
+	const [gatewayDepositDone, setGatewayDepositDone] = useState(false);
+	const [gatewayBalance, setGatewayBalance] = useState<string | null>(null);
+	const [gatewayBalanceLoading, setGatewayBalanceLoading] = useState(false);
+	const gatewayDepositRef = useRef<{
+		phase: "approve" | "deposit";
+		usdcAddress: string;
+		amountUnits: bigint;
+	} | null>(null);
 
-	const { isConnected, chain } = useAccount();
+	const { address: walletAddress, isConnected, chain } = useAccount();
 	const { switchChainAsync } = useSwitchChain();
 	const { open } = useAppKit();
 	const {
@@ -74,6 +147,7 @@ export default function PayPage() {
 		isError: isWriteError,
 		reset: resetWriteContract,
 	} = useWriteContract();
+	const { signTypedDataAsync } = useSignTypedData();
 
 	// Wait for tx to be mined before we call verify (avoids "Transaction not found")
 	const { data: receipt, isSuccess: isReceiptSuccess } =
@@ -108,16 +182,37 @@ export default function PayPage() {
 		if (!txHash || !payingForSessionRef.current) return;
 		const payload = readyPayloadRef.current;
 		if (!payload) return;
+		setGatewayStep("idle");
 		// Only set confirming if we're still in ready (avoid overwriting verifying/verified)
 		setState((s) =>
 			s.status === "ready" ? { ...payload, status: "confirming" } : s,
 		);
 	}, [txHash]);
 
+	// Gateway deposit flow: after approve confirms, run deposit; after deposit confirms, mark done
+	useEffect(() => {
+		if (!isReceiptSuccess || !txHash || !gatewayDepositRef.current) return;
+		const next = gatewayDepositRef.current;
+		if (next.phase === "approve") {
+			gatewayDepositRef.current = { ...next, phase: "deposit" };
+			writeContract({
+				address: GATEWAY_WALLET_ADDRESS,
+				abi: GATEWAY_DEPOSIT_ABI,
+				functionName: "deposit",
+				args: [next.usdcAddress as `0x${string}`, next.amountUnits],
+			});
+		} else {
+			gatewayDepositRef.current = null;
+			setGatewayDepositDone(true);
+			setGatewayError(null);
+		}
+	}, [isReceiptSuccess, txHash, writeContract]);
+
 	// Auto-verify only after tx is mined (receipt exists) so our server finds the receipt
 	useEffect(() => {
 		if (!isReceiptSuccess || !receipt || !txHash || !payingForSessionRef.current)
 			return;
+		if (gatewayDepositRef.current) return; // let the deposit effect handle it
 		const sessionToken = payingForSessionRef.current;
 		const payload = readyPayloadRef.current;
 		payingForSessionRef.current = null;
@@ -126,10 +221,11 @@ export default function PayPage() {
 		queueMicrotask(() =>
 			setState({ ...payload, status: "verifying" }),
 		);
+		const chainId = payload.chainId ?? BASE_SEPOLIA_CHAIN_ID;
 		fetch("/api/install/verify", {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({ sessionToken, transactionHash: txHash }),
+			body: JSON.stringify({ sessionToken, transactionHash: txHash, chainId }),
 		})
 			.then((res) => res.json())
 			.then((result) => {
@@ -163,9 +259,10 @@ export default function PayPage() {
 			return;
 		}
 
-		if (chain?.id !== BASE_SEPOLIA_CHAIN_ID) {
+		const targetChainId = state.chainId ?? BASE_SEPOLIA_CHAIN_ID;
+		if (chain?.id !== targetChainId) {
 			try {
-				await switchChainAsync({ chainId: BASE_SEPOLIA_CHAIN_ID });
+				await switchChainAsync({ chainId: targetChainId });
 			} catch {
 				return;
 			}
@@ -181,6 +278,114 @@ export default function PayPage() {
 			args: [recipient as `0x${string}`, BigInt(amountUnits)],
 		});
 	}, [state, isConnected, chain?.id, switchChainAsync, open, writeContract, resetWriteContract]);
+
+	const handlePayWithGateway = useCallback(async () => {
+		if (state.status !== "ready" || !walletAddress) return;
+		setGatewayError(null);
+		setGatewayStep("loading");
+		try {
+			const res = await fetch(
+				`/api/circle/gateway/attestation?session=${encodeURIComponent(state.sessionToken)}&depositor=${encodeURIComponent(walletAddress)}&sourceChainId=${gatewaySourceChainId}`,
+			);
+			if (!res.ok) {
+				const data = await res.json().catch(() => ({}));
+				throw new Error(data.error ?? "Failed to get burn intent");
+			}
+			const data = await res.json();
+			const msg = data.message;
+			// Rebuild typed data with bigint for signTypedData
+			const message = {
+				...msg,
+				maxBlockHeight: BigInt(msg.maxBlockHeight),
+				maxFee: BigInt(msg.maxFee),
+				spec: {
+					...msg.spec,
+					value: BigInt(msg.spec.value),
+				},
+			};
+			const typedData = { ...data.typedData, message };
+			setGatewayStep("sign");
+			const signature = await signTypedDataAsync(typedData);
+			setGatewayStep("request");
+			const postRes = await fetch("/api/circle/gateway/attestation", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					sessionToken: state.sessionToken,
+					burnIntent: data.message,
+					signature,
+				}),
+			});
+			if (!postRes.ok) {
+				const errData = await postRes.json().catch(() => ({}));
+				throw new Error(errData.error ?? "Attestation failed");
+			}
+			const { attestation, signature: sig } = await postRes.json();
+			const attestationHex = attestation.startsWith("0x") ? attestation : `0x${attestation}`;
+			const sigHex = sig.startsWith("0x") ? sig : `0x${sig}`;
+			if (chain?.id !== ARC_TESTNET_CHAIN_ID) {
+				await switchChainAsync({ chainId: ARC_TESTNET_CHAIN_ID });
+			}
+			payingForSessionRef.current = state.sessionToken;
+			readyPayloadRef.current = { ...state, chainId: ARC_TESTNET_CHAIN_ID };
+			setGatewayStep("mint");
+			resetWriteContract?.();
+			writeContract({
+				address: GATEWAY_MINTER_ADDRESS,
+				abi: GATEWAY_MINTER_ABI,
+				functionName: "gatewayMint",
+				args: [attestationHex as `0x${string}`, sigHex as `0x${string}`],
+			});
+		} catch (err) {
+			setGatewayError(err instanceof Error ? err.message : "Gateway payment failed");
+			setGatewayStep("idle");
+		}
+	}, [
+		state,
+		walletAddress,
+		gatewaySourceChainId,
+		chain?.id,
+		switchChainAsync,
+		signTypedDataAsync,
+		writeContract,
+		resetWriteContract,
+	]);
+
+	const handleDepositToGateway = useCallback(async () => {
+		if (!isConnected || !walletAddress) return;
+		const usdcAddress = USDC_BY_CHAIN[gatewaySourceChainId];
+		if (!usdcAddress) return;
+		setGatewayError(null);
+		setGatewayDepositDone(false);
+		try {
+			if (chain?.id !== gatewaySourceChainId) {
+				await switchChainAsync({ chainId: gatewaySourceChainId });
+			}
+			gatewayDepositRef.current = {
+				phase: "approve",
+				usdcAddress,
+				amountUnits: GATEWAY_DEPOSIT_AMOUNT_UNITS,
+			};
+			resetWriteContract?.();
+			writeContract({
+				address: usdcAddress as `0x${string}`,
+				abi: ERC20_APPROVE_ABI,
+				functionName: "approve",
+				args: [GATEWAY_WALLET_ADDRESS, GATEWAY_DEPOSIT_AMOUNT_UNITS],
+			});
+		} catch (err) {
+			gatewayDepositRef.current = null;
+			setGatewayError(err instanceof Error ? err.message : "Deposit failed");
+		}
+	}, [
+		isConnected,
+		walletAddress,
+		chain?.id,
+		gatewaySourceChainId,
+		switchChainAsync,
+		writeContract,
+		resetWriteContract,
+	]);
 
 	const fetchSession = useCallback(async (token: string) => {
 		setState({ status: "loading" });
@@ -221,6 +426,8 @@ export default function PayPage() {
 				pricingModel: data.pricingModel,
 				githubUsername: data.githubUsername,
 				githubUserId: data.githubUserId,
+				receiveMode: data.receiveMode,
+				paymentOptions: data.paymentOptions,
 			});
 		} catch {
 			setState({ status: "invalid", error: "Failed to load session" });
@@ -281,6 +488,7 @@ export default function PayPage() {
 		)?.value?.trim();
 		if (!txHash) return;
 		setState({ ...state, status: "verifying" });
+		const chainId = state.chainId ?? BASE_SEPOLIA_CHAIN_ID;
 		try {
 			const res = await fetch("/api/install/verify", {
 				method: "POST",
@@ -288,6 +496,7 @@ export default function PayPage() {
 				body: JSON.stringify({
 					sessionToken: state.sessionToken,
 					transactionHash: txHash,
+					chainId,
 				}),
 			});
 			const data = await res.json().catch(() => ({}));
@@ -468,10 +677,175 @@ export default function PayPage() {
 						<dt className="text-sm text-muted-foreground">
 							Network
 						</dt>
-						<dd className="text-sm">Base Sepolia</dd>
+						<dd className="text-sm">
+							{state.chainId === ARC_TESTNET_CHAIN_ID ? "Arc" : "Base Sepolia"}
+						</dd>
 					</div>
 				</dl>
 			</div>
+
+			{state.paymentOptions && state.paymentOptions.length > 1 && (
+				<div className="space-y-2">
+					<p className="text-sm font-medium">Pay with USDC on</p>
+					<div className="flex gap-2">
+						{state.paymentOptions.map((option) => (
+							<button
+								key={option.chainId}
+								type="button"
+								onClick={() => {
+									setState({
+										...state,
+										paymentUri: option.paymentUri,
+										chainId: option.chainId,
+										tokenAddress: option.tokenAddress,
+									});
+								}}
+								className={`rounded-md border px-4 py-2 text-sm font-medium transition-colors ${
+									state.chainId === option.chainId
+										? "border-primary bg-primary/10 text-primary"
+										: "border-input bg-background hover:bg-muted"
+								}`}
+							>
+								{option.chainName}
+							</button>
+						))}
+					</div>
+					<p className="text-xs text-muted-foreground">
+						Choose the chain where you have USDC. Your selected address receives funds on that chain.
+					</p>
+				</div>
+			)}
+
+			{state.receiveMode === "any_chain" && (
+				<div className="space-y-2 rounded-lg border border-dashed border-primary/40 bg-primary/5 p-4">
+					<p className="text-sm font-medium">Pay with Circle Gateway (cross-chain → Arc)</p>
+					<p className="text-xs text-muted-foreground">
+						Use your unified USDC balance in Circle Gateway. Funds arrive on Arc as the liquidity hub.
+						You must deposit USDC into the Gateway first (e.g.{" "}
+						<a
+							href="https://faucet.circle.com"
+							target="_blank"
+							rel="noopener noreferrer"
+							className="underline hover:no-underline"
+						>
+							Circle Faucet
+						</a>
+						{" "}+ Gateway deposit on Base Sepolia or Arc).
+					</p>
+					<div className="flex flex-wrap items-center gap-2">
+						<span className="text-xs text-muted-foreground">Source chain (Gateway balance):</span>
+						<button
+							type="button"
+							onClick={() => setGatewaySourceChainId(BASE_SEPOLIA_CHAIN_ID)}
+							className={`rounded-md border px-3 py-1.5 text-xs font-medium ${
+								gatewaySourceChainId === BASE_SEPOLIA_CHAIN_ID
+									? "border-primary bg-primary/10 text-primary"
+									: "border-input bg-background hover:bg-muted"
+							}`}
+						>
+							Base Sepolia
+						</button>
+						<button
+							type="button"
+							onClick={() => setGatewaySourceChainId(ARC_TESTNET_CHAIN_ID)}
+							className={`rounded-md border px-3 py-1.5 text-xs font-medium ${
+								gatewaySourceChainId === ARC_TESTNET_CHAIN_ID
+									? "border-primary bg-primary/10 text-primary"
+									: "border-input bg-background hover:bg-muted"
+							}`}
+						>
+							Arc
+						</button>
+					</div>
+					{gatewayDepositDone && (
+						<p className="text-sm text-green-600 dark:text-green-400">
+							Deposit complete. Use the <strong>same chain</strong> above as source. Wait 2–5 min (or up to ~20 min) for finality, then check balance below.
+						</p>
+					)}
+					{isConnected && walletAddress && (
+						<div className="flex flex-wrap items-center gap-2">
+							<button
+								type="button"
+								onClick={async () => {
+									setGatewayBalanceLoading(true);
+									setGatewayBalance(null);
+									try {
+										const r = await fetch(
+											`/api/circle/gateway/balances?depositor=${encodeURIComponent(walletAddress)}`,
+										);
+										const d = await r.json();
+										if (r.ok && typeof d.total === "string") setGatewayBalance(d.total);
+										else setGatewayBalance(null);
+									} catch {
+										setGatewayBalance(null);
+									} finally {
+										setGatewayBalanceLoading(false);
+									}
+								}}
+								disabled={gatewayBalanceLoading}
+								className="rounded-md border px-2 py-1 text-xs font-medium hover:bg-muted disabled:opacity-50"
+							>
+								{gatewayBalanceLoading ? "Checking…" : "Check Gateway balance"}
+							</button>
+							{gatewayBalance !== null && (
+								<span className="text-xs text-muted-foreground">
+									Gateway balance: <strong>{gatewayBalance} USDC</strong>
+									{parseFloat(gatewayBalance) < 0.11 && " — need ≥0.11 to pay (wait for finality)."}
+								</span>
+							)}
+						</div>
+					)}
+					<div className="flex flex-wrap items-center gap-2">
+						<button
+							type="button"
+							onClick={handleDepositToGateway}
+							disabled={
+								!isConnected ||
+								isWritePending ||
+								!!gatewayDepositRef.current
+							}
+							className="rounded-md border border-amber-500/50 bg-amber-500/10 px-3 py-1.5 text-xs font-medium text-amber-700 dark:text-amber-400 hover:bg-amber-500/20 disabled:opacity-50"
+						>
+							{gatewayDepositRef.current
+								? gatewayDepositRef.current.phase === "approve"
+									? "Confirm approve in wallet…"
+									: "Confirm deposit in wallet…"
+								: `Deposit ${GATEWAY_DEPOSIT_AMOUNT_USDC} USDC to Gateway`}
+						</button>
+						<span className="text-xs text-muted-foreground">
+							Uses wallet USDC on selected chain → Gateway balance
+						</span>
+					</div>
+					{gatewayError && (
+						<p className="text-sm text-destructive">{gatewayError}</p>
+					)}
+					<button
+						type="button"
+						onClick={handlePayWithGateway}
+						disabled={
+							!isConnected ||
+							subscriptionNeedsGithub ||
+							gatewayStep === "loading" ||
+							gatewayStep === "sign" ||
+							gatewayStep === "request" ||
+							isWritePending
+						}
+						className="rounded-md border border-primary bg-primary/10 px-4 py-2 text-sm font-medium text-primary hover:bg-primary/20 disabled:opacity-50"
+					>
+						{!isConnected
+							? "Connect wallet"
+							: gatewayStep === "loading"
+								? "Loading…"
+								: gatewayStep === "sign"
+									? "Sign in wallet…"
+									: gatewayStep === "request"
+										? "Requesting attestation…"
+										: gatewayStep === "mint" || isWritePending
+											? "Confirm mint in wallet…"
+											: "Pay with Gateway"}
+					</button>
+				</div>
+			)}
 
 			{paymentUri ? (
 				<div className="space-y-3">
@@ -509,7 +883,7 @@ export default function PayPage() {
 							</button>
 							<p className="text-xs text-muted-foreground">
 								{!isConnected
-									? "Connect to pay with USDC on Base Sepolia."
+									? `Connect to pay with USDC on ${state.chainId === ARC_TESTNET_CHAIN_ID ? "Arc" : "Base Sepolia"}.`
 									: "Opens your wallet to send USDC (recipient and amount pre-filled)."}
 							</p>
 						</div>

@@ -1,9 +1,9 @@
 "use client";
 
-import { wagmiAdapter, projectId } from "@/config";
+import { wagmiAdapter, projectId, networks } from "@/config";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createAppKit } from "@reown/appkit/react";
-import { base, baseSepolia } from "@reown/appkit/networks";
+import { baseSepolia } from "@reown/appkit/networks";
 import React, { type ReactNode } from "react";
 import { cookieToInitialState, WagmiProvider, type Config } from "wagmi";
 
@@ -29,11 +29,11 @@ const metadata = {
 	icons: ["https://avatars.githubusercontent.com/u/179229932"],
 };
 
-// Create the modal
+// Create the modal (networks include Arc from config)
 createAppKit({
 	adapters: [wagmiAdapter],
 	projectId,
-	networks: [base, baseSepolia],
+	networks,
 	defaultNetwork: baseSepolia,
 	metadata: metadata,
 	features: {
