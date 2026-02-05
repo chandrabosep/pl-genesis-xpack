@@ -12,9 +12,19 @@ import {
 } from "wagmi";
 import { useAppKit } from "@reown/appkit/react";
 import { AlertCircle, Wallet, Hash } from "lucide-react";
-import { SUPPORTED_CHAINS } from "@/lib/x402/payment-config";
+import {
+	SUPPORTED_CHAINS,
+	SUI_DECIMALS,
+} from "@/lib/x402/payment-config";
 import { CopyButton } from "@/components/ui/copy-button";
 import { Button } from "@/components/ui/button";
+import {
+	ConnectModal,
+	useCurrentWallet,
+	useSignAndExecuteTransaction,
+} from "@mysten/dapp-kit";
+import { Transaction } from "@mysten/sui/transactions";
+import "@mysten/dapp-kit/dist/index.css";
 
 /** Circle Gateway Minter on Arc (and other EVM testnets). */
 const GATEWAY_MINTER_ADDRESS =
@@ -95,7 +105,8 @@ const GATEWAY_DEPOSIT_AMOUNT_UNITS = BigInt(
 function isUserRejectedRequestError(err: unknown): boolean {
 	if (!err || typeof err !== "object") return false;
 	const msg =
-		"message" in err && typeof (err as { message?: string }).message === "string"
+		"message" in err &&
+		typeof (err as { message?: string }).message === "string"
 			? (err as { message: string }).message
 			: "";
 	const name = "name" in err ? String((err as { name?: string }).name) : "";
@@ -116,6 +127,13 @@ type PaymentOption = {
 	chainName: string;
 };
 
+type SuiPaymentOption = {
+	amountSui: string;
+	suiAddress: string;
+	currency: string;
+	network: "mainnet" | "testnet";
+};
+
 type ReadyPayload = {
 	price: number;
 	address: string;
@@ -129,8 +147,9 @@ type ReadyPayload = {
 	pricingModel?: string;
 	githubUsername?: string;
 	githubUserId?: string;
-	receiveMode?: "base" | "any_chain";
+	receiveMode?: "base" | "any_chain" | "sui";
 	paymentOptions?: PaymentOption[];
+	suiPaymentOption?: SuiPaymentOption;
 };
 
 type SessionState =
@@ -185,6 +204,16 @@ export default function PayPage() {
 	const [gatewayDepositDone, setGatewayDepositDone] = useState(false);
 	const [gatewayBalance, setGatewayBalance] = useState<string | null>(null);
 	const [gatewayBalanceLoading, setGatewayBalanceLoading] = useState(false);
+	const [suiVerifyDigest, setSuiVerifyDigest] = useState("");
+	const [suiVerifying, setSuiVerifying] = useState(false);
+	const [suiVerifyError, setSuiVerifyError] = useState<string | null>(null);
+	const [suiConnectOpen, setSuiConnectOpen] = useState(false);
+	const [suiPayError, setSuiPayError] = useState<string | null>(null);
+	const suiWallet = useCurrentWallet();
+	const {
+		mutateAsync: signAndExecuteSui,
+		isPending: suiSignPending,
+	} = useSignAndExecuteTransaction();
 	const gatewayDepositRef = useRef<{
 		phase: "approve" | "deposit";
 		usdcAddress: string;
@@ -527,6 +556,7 @@ export default function PayPage() {
 					githubUserId: data.githubUserId,
 					receiveMode: data.receiveMode,
 					paymentOptions: data.paymentOptions,
+					suiPaymentOption: data.suiPaymentOption,
 				});
 			} catch {
 				setState({
@@ -616,6 +646,40 @@ export default function PayPage() {
 			}
 		} catch {
 			setState({ status: "verify_error", error: "Verification failed" });
+		}
+	};
+
+	const handleVerifySui = async (e: React.FormEvent<HTMLFormElement>) => {
+		e.preventDefault();
+		if (state.status !== "ready" || !state.suiPaymentOption) return;
+		const digest = (
+			e.currentTarget.elements.namedItem(
+				"suiTransactionDigest",
+			) as HTMLInputElement
+		)?.value?.trim();
+		if (!digest) return;
+		setSuiVerifyError(null);
+		setSuiVerifying(true);
+		try {
+			const res = await fetch("/api/install/verify", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					sessionToken: state.sessionToken,
+					transactionDigest: digest,
+					paymentType: "sui",
+				}),
+			});
+			const data = await res.json().catch(() => ({}));
+			if (res.ok && data.verified) {
+				setState({ status: "verified" });
+			} else {
+				setSuiVerifyError(data.error ?? "Verification failed");
+			}
+		} catch {
+			setSuiVerifyError("Verification failed");
+		} finally {
+			setSuiVerifying(false);
 		}
 	};
 
@@ -725,13 +789,20 @@ export default function PayPage() {
 	const hasGithub = !!state.githubUsername || githubSaved;
 	const subscriptionNeedsGithub = isSubscription && !hasGithub;
 
-	const networkLabel =
-		state.receiveMode === "any_chain"
+	const isSuiOnly = state.receiveMode === "sui";
+	const networkLabel = isSuiOnly
+		? state.suiPaymentOption?.network === "testnet"
+			? "Sui Testnet"
+			: "Sui"
+		: state.receiveMode === "any_chain"
 			? "Arc (via Gateway)"
 			: state.chainId === ARC_TESTNET_CHAIN_ID
 				? "Arc"
 				: "Base Sepolia";
-	const amountCopyText = `${price} ${state.currency ?? "USDC"}`;
+	const amountCopyText =
+		isSuiOnly && state.suiPaymentOption
+			? `${state.suiPaymentOption.amountSui} ${state.suiPaymentOption.currency}`
+			: `${price} ${state.currency ?? "USDC"}`;
 
 	return (
 		<main className="min-h-screen bg-muted/30">
@@ -776,17 +847,21 @@ export default function PayPage() {
 						</span>
 						Pay
 					</span>
-					{state.receiveMode !== "any_chain" && (
-						<>
-							<span className="h-px w-6 bg-border" aria-hidden />
-							<span className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
-								<span className="flex h-6 w-6 items-center justify-center rounded-full bg-muted text-xs">
-									3
+					{state.receiveMode !== "any_chain" &&
+						state.receiveMode !== "sui" && (
+							<>
+								<span
+									className="h-px w-6 bg-border"
+									aria-hidden
+								/>
+								<span className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
+									<span className="flex h-6 w-6 items-center justify-center rounded-full bg-muted text-xs">
+										3
+									</span>
+									Verify
 								</span>
-								Verify
-							</span>
-						</>
-					)}
+							</>
+						)}
 				</div>
 
 				<div className="space-y-4">
@@ -894,7 +969,11 @@ export default function PayPage() {
 									}`}
 								>
 									{(() => {
-										if (isUserRejectedRequestError(writeError)) {
+										if (
+											isUserRejectedRequestError(
+												writeError,
+											)
+										) {
 											return "You can try again when ready.";
 										}
 										const msg = writeError?.message ?? "";
@@ -962,6 +1041,188 @@ export default function PayPage() {
 						</div>
 					</section>
 
+					{/* Pay with SUI (optional) */}
+					{state.suiPaymentOption && (
+						<section
+							className="rounded-2xl border-2 border-[#6fbcf0]/30 bg-[#6fbcf0]/5 p-4 shadow-sm"
+							aria-label="Pay with SUI"
+						>
+							<div className="flex items-center gap-2">
+								<div className="h-5 w-5 shrink-0 rounded-full bg-[#6fbcf0]" />
+								<h2 className="text-base font-semibold text-foreground">
+									Pay with SUI
+									{state.suiPaymentOption.network ===
+										"testnet" && (
+										<span className="ml-1.5 text-xs font-normal text-muted-foreground">
+											(Testnet)
+										</span>
+									)}
+								</h2>
+							</div>
+							<p className="mt-1.5 text-sm text-muted-foreground">
+								Send SUI on Sui{" "}
+								{state.suiPaymentOption.network === "testnet"
+									? "testnet"
+									: "mainnet"}{" "}
+								to the address below. After sending, paste the
+								transaction digest to verify.
+							</p>
+							<div className="mt-4 space-y-3">
+								<div>
+									<p className="text-xs font-medium text-muted-foreground">
+										Amount
+									</p>
+									<p className="mt-1 font-semibold tabular-nums text-foreground">
+										{state.suiPaymentOption.amountSui}{" "}
+										{state.suiPaymentOption.currency}
+									</p>
+									<CopyButton
+										value={`${state.suiPaymentOption.amountSui} ${state.suiPaymentOption.currency}`}
+										buttonText="Copy"
+										variant="ghost"
+										size="xs"
+										className="mt-1 -ml-1 rounded-lg"
+									/>
+								</div>
+								<div>
+									<p className="text-xs font-medium text-muted-foreground">
+										Sui receive address
+									</p>
+									<div className="mt-1.5 flex flex-wrap items-center gap-2">
+										<code className="max-w-full break-all rounded-lg bg-muted/60 px-2 py-1.5 font-mono text-sm">
+											{state.suiPaymentOption.suiAddress}
+										</code>
+										<CopyButton
+											value={
+												state.suiPaymentOption
+													.suiAddress
+											}
+											label="Copy Sui address"
+											buttonText="Copy"
+											variant="outline"
+											size="xs"
+											className="rounded-lg"
+										/>
+									</div>
+								</div>
+								{/* Open Sui Wallet extension to pay (connect if needed, then sign & execute) */}
+								<div className="flex flex-col gap-2">
+									<ConnectModal
+										trigger={<span className="hidden" aria-hidden />}
+										open={suiConnectOpen}
+										onOpenChange={setSuiConnectOpen}
+									/>
+									<Button
+										type="button"
+										disabled={suiVerifying || suiSignPending}
+										onClick={async () => {
+											const opt = state.suiPaymentOption!;
+											setSuiPayError(null);
+											if (suiWallet.connectionStatus === "disconnected") {
+												setSuiConnectOpen(true);
+												return;
+											}
+											const amountMist = BigInt(
+												Math.ceil(
+													parseFloat(opt.amountSui) * 10 ** SUI_DECIMALS,
+												),
+											);
+											const chain =
+												opt.network === "testnet"
+													? "sui:testnet"
+													: "sui:mainnet";
+											const tx = new Transaction();
+											const [coin] = tx.splitCoins(tx.gas, [amountMist]);
+											tx.transferObjects([coin], opt.suiAddress);
+											try {
+												const result = await signAndExecuteSui({
+													transaction: tx,
+													chain,
+												});
+												const digest =
+													typeof result === "object" &&
+													result !== null &&
+													"digest" in result &&
+													typeof (result as { digest?: string }).digest === "string"
+														? (result as { digest: string }).digest
+														: undefined;
+												if (digest) setSuiVerifyDigest(digest);
+											} catch (err) {
+												setSuiPayError(
+													err instanceof Error ? err.message : "Transaction failed",
+												);
+											}
+										}}
+										className="w-full rounded-xl border-2 border-[#6fbcf0] bg-[#6fbcf0] py-3 font-semibold text-white hover:bg-[#5aabdf] hover:text-white"
+									>
+										{suiWallet.connectionStatus === "disconnected"
+											? "Connect Sui Wallet"
+											: suiSignPending
+												? "Confirm in wallet…"
+												: "Pay with Sui Wallet"}
+									</Button>
+									{suiPayError && (
+										<p className="text-center text-sm text-destructive" role="alert">
+											{suiPayError}
+										</p>
+									)}
+									<p className="text-center text-xs text-muted-foreground">
+										{suiWallet.connectionStatus === "disconnected"
+											? "Connect your Sui wallet extension to pay"
+											: "Opens your Sui wallet extension to sign and send"}
+									</p>
+								</div>
+								<div className="border-t border-border pt-3">
+									<p className="mb-1.5 text-xs font-medium text-muted-foreground">
+										Already sent? Verify with transaction
+										digest
+									</p>
+									<form
+										onSubmit={handleVerifySui}
+										className="flex flex-col gap-2 sm:flex-row sm:items-end"
+									>
+										<input
+											id="suiTransactionDigest"
+											name="suiTransactionDigest"
+											type="text"
+											value={suiVerifyDigest}
+											onChange={(e) => {
+												setSuiVerifyDigest(
+													e.target.value,
+												);
+												setSuiVerifyError(null);
+											}}
+											placeholder="Paste transaction digest from Sui wallet/explorer"
+											className="min-w-0 flex-1 rounded-xl border border-input bg-background px-3.5 py-2.5 font-mono text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+											disabled={suiVerifying}
+										/>
+										<Button
+											type="submit"
+											disabled={
+												suiVerifying ||
+												!suiVerifyDigest.trim() ||
+												subscriptionNeedsGithub
+											}
+											className="rounded-xl py-2.5 font-medium sm:w-auto sm:min-w-[140px]"
+										>
+											{suiVerifying
+												? "Verifying…"
+												: "Verify SUI payment"}
+										</Button>
+									</form>
+									{suiVerifyError && (
+										<p
+											className="mt-2 text-sm text-destructive"
+											role="alert"
+										>
+											{suiVerifyError}
+										</p>
+									)}
+								</div>
+							</div>
+						</section>
+					)}
+
 					{/* Step 2: Circle Gateway */}
 					{state.receiveMode === "any_chain" && (
 						<section
@@ -991,7 +1252,8 @@ export default function PayPage() {
 							{/* Step 2a: Source chain */}
 							<div className="mt-4">
 								<p className="mb-1.5 text-xs font-medium text-muted-foreground">
-									1. Select chain where you deposited into Gateway
+									1. Select chain where you deposited into
+									Gateway
 								</p>
 								<div className="flex flex-wrap gap-2">
 									{SUPPORTED_CHAINS.map((c) => (
@@ -999,13 +1261,16 @@ export default function PayPage() {
 											key={c.chainId}
 											type="button"
 											variant={
-												gatewaySourceChainId === c.chainId
+												gatewaySourceChainId ===
+												c.chainId
 													? "default"
 													: "outline"
 											}
 											size="sm"
 											onClick={() =>
-												setGatewaySourceChainId(c.chainId)
+												setGatewaySourceChainId(
+													c.chainId,
+												)
 											}
 											className="rounded-lg"
 										>
@@ -1042,14 +1307,20 @@ export default function PayPage() {
 													const d = await r.json();
 													if (
 														r.ok &&
-														typeof d.total === "string"
+														typeof d.total ===
+															"string"
 													)
-														setGatewayBalance(d.total);
-													else setGatewayBalance(null);
+														setGatewayBalance(
+															d.total,
+														);
+													else
+														setGatewayBalance(null);
 												} catch {
 													setGatewayBalance(null);
 												} finally {
-													setGatewayBalanceLoading(false);
+													setGatewayBalanceLoading(
+														false,
+													);
 												}
 											}}
 											disabled={gatewayBalanceLoading}
@@ -1104,7 +1375,10 @@ export default function PayPage() {
 							</div>
 
 							{gatewayError && (
-								<p className="mt-2 text-sm text-destructive" role="alert">
+								<p
+									className="mt-2 text-sm text-destructive"
+									role="alert"
+								>
 									{gatewayError}
 								</p>
 							)}
@@ -1136,7 +1410,7 @@ export default function PayPage() {
 												: gatewayStep === "request"
 													? "Requesting attestation…"
 													: gatewayStep === "mint" ||
-															isWritePending
+														  isWritePending
 														? "Confirm mint in wallet…"
 														: "Pay with Gateway"}
 								</Button>
@@ -1144,125 +1418,133 @@ export default function PayPage() {
 						</section>
 					)}
 
-					{/* Step 2 (direct): Pay with wallet + Verify in one card */}
-					{state.receiveMode !== "any_chain" && (
-						<section
-							className="rounded-2xl border border-border bg-card p-4 shadow-sm"
-							aria-label="Pay and verify"
-						>
-							{paymentUri ? (
-								<>
-									<div className="flex items-center gap-2">
-										<Wallet className="h-5 w-5 text-primary" />
-										<h2 className="text-base font-semibold text-foreground">
-											Pay with your wallet
-										</h2>
-									</div>
-									<p className="mt-1.5 text-sm text-muted-foreground">
-										Scan the QR code or open your wallet
-										with amount and recipient pre-filled.
-									</p>
-									<div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-start">
-										{qrDataUrl && (
-											<div className="shrink-0 overflow-hidden rounded-xl border border-border bg-white p-2.5 shadow-sm">
-												{/* eslint-disable-next-line @next/next/no-img-element -- QR data URL */}
-												<img
-													src={qrDataUrl}
-													alt="Payment QR code"
-													width={200}
-													height={200}
-												/>
-											</div>
-										)}
-										<div className="flex flex-1 flex-col gap-2">
-											<Button
-												type="button"
-												onClick={handlePayWithWallet}
-												disabled={
-													isWritePending ||
-													subscriptionNeedsGithub
-												}
-												className="w-full rounded-xl py-3 font-medium sm:w-auto"
-											>
-												{!isConnected
-													? "Connect wallet"
-													: isWritePending
-														? "Confirm in wallet…"
-														: "Pay with wallet"}
-											</Button>
-											<p className="text-xs text-muted-foreground">
-												{!isConnected
-													? `Connect to pay with USDC on ${networkLabel}.`
-													: "Opens your wallet with recipient and amount pre-filled."}
-											</p>
+					{/* Step 2 (direct): Pay with wallet + Verify in one card (Base only; Sui uses block above) */}
+					{state.receiveMode !== "any_chain" &&
+						state.receiveMode !== "sui" && (
+							<section
+								className="rounded-2xl border border-border bg-card p-4 shadow-sm"
+								aria-label="Pay and verify"
+							>
+								{paymentUri ? (
+									<>
+										<div className="flex items-center gap-2">
+											<Wallet className="h-5 w-5 text-primary" />
+											<h2 className="text-base font-semibold text-foreground">
+												Pay with your wallet
+											</h2>
 										</div>
-									</div>
-								</>
-							) : (
-								<p className="text-sm text-muted-foreground">
-									Send the amount above to the address, then
-									paste the transaction hash below to verify.
-								</p>
-							)}
-
-							{/* Verify: same card, clear separation */}
-							<div className="mt-4 border-t border-border pt-4">
-								<div className="flex items-center gap-2">
-									<Hash className="h-5 w-5 text-muted-foreground" />
-									<h3 className="text-sm font-semibold text-foreground">
-										Already sent? Verify with transaction hash
-									</h3>
-								</div>
-								<form
-									className="mt-2"
-									onSubmit={(e) => {
-										if (subscriptionNeedsGithub) {
-											e.preventDefault();
-											return;
-										}
-										handleVerify(e);
-									}}
-								>
-									<label
-										htmlFor="transactionHash"
-										className="sr-only"
-									>
-										Transaction hash
-									</label>
-									<input
-										id="transactionHash"
-										name="transactionHash"
-										type="text"
-										required
-										placeholder="Paste 0x… transaction hash"
-										className="w-full rounded-xl border border-input bg-background px-3.5 py-2.5 font-mono text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-										disabled={state.status === "verifying"}
-									/>
-									<Button
-										type="submit"
-										disabled={
-											state.status === "confirming" ||
-											state.status === "verifying" ||
-											subscriptionNeedsGithub
-										}
-										className="mt-2 w-full rounded-xl py-2.5 font-medium sm:w-auto sm:min-w-[140px]"
-									>
-										{state.status === "confirming"
-											? "Confirming…"
-											: state.status === "verifying"
-												? "Verifying…"
-												: "Verify payment"}
-									</Button>
-									{subscriptionNeedsGithub && (
-										<p className="mt-1.5 text-xs text-muted-foreground">
-											Save your GitHub username above
-											before verifying.
+										<p className="mt-1.5 text-sm text-muted-foreground">
+											Scan the QR code or open your wallet
+											with amount and recipient
+											pre-filled.
 										</p>
-									)}
-								</form>
-							</div>
-						</section>
-					)}
+										<div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-start">
+											{qrDataUrl && (
+												<div className="shrink-0 overflow-hidden rounded-xl border border-border bg-white p-2.5 shadow-sm">
+													{/* eslint-disable-next-line @next/next/no-img-element -- QR data URL */}
+													<img
+														src={qrDataUrl}
+														alt="Payment QR code"
+														width={200}
+														height={200}
+													/>
+												</div>
+											)}
+											<div className="flex flex-1 flex-col gap-2">
+												<Button
+													type="button"
+													onClick={
+														handlePayWithWallet
+													}
+													disabled={
+														isWritePending ||
+														subscriptionNeedsGithub
+													}
+													className="w-full rounded-xl py-3 font-medium sm:w-auto"
+												>
+													{!isConnected
+														? "Connect wallet"
+														: isWritePending
+															? "Confirm in wallet…"
+															: "Pay with wallet"}
+												</Button>
+												<p className="text-xs text-muted-foreground">
+													{!isConnected
+														? `Connect to pay with USDC on ${networkLabel}.`
+														: "Opens your wallet with recipient and amount pre-filled."}
+												</p>
+											</div>
+										</div>
+									</>
+								) : (
+									<p className="text-sm text-muted-foreground">
+										Send the amount above to the address,
+										then paste the transaction hash below to
+										verify.
+									</p>
+								)}
+
+								{/* Verify: same card, clear separation */}
+								<div className="mt-4 border-t border-border pt-4">
+									<div className="flex items-center gap-2">
+										<Hash className="h-5 w-5 text-muted-foreground" />
+										<h3 className="text-sm font-semibold text-foreground">
+											Already sent? Verify with
+											transaction hash
+										</h3>
+									</div>
+									<form
+										className="mt-2"
+										onSubmit={(e) => {
+											if (subscriptionNeedsGithub) {
+												e.preventDefault();
+												return;
+											}
+											handleVerify(e);
+										}}
+									>
+										<label
+											htmlFor="transactionHash"
+											className="sr-only"
+										>
+											Transaction hash
+										</label>
+										<input
+											id="transactionHash"
+											name="transactionHash"
+											type="text"
+											required
+											placeholder="Paste 0x… transaction hash"
+											className="w-full rounded-xl border border-input bg-background px-3.5 py-2.5 font-mono text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+											disabled={
+												state.status === "verifying"
+											}
+										/>
+										<Button
+											type="submit"
+											disabled={
+												state.status === "confirming" ||
+												state.status === "verifying" ||
+												subscriptionNeedsGithub
+											}
+											className="mt-2 w-full rounded-xl py-2.5 font-medium sm:w-auto sm:min-w-[140px]"
+										>
+											{state.status === "confirming"
+												? "Confirming…"
+												: state.status === "verifying"
+													? "Verifying…"
+													: "Verify payment"}
+										</Button>
+										{subscriptionNeedsGithub && (
+											<p className="mt-1.5 text-xs text-muted-foreground">
+												Save your GitHub username above
+												before verifying.
+											</p>
+										)}
+									</form>
+								</div>
+							</section>
+						)}
 
 					{/* Status: confirming / verifying */}
 					{(state.status === "confirming" ||

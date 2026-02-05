@@ -27,6 +27,7 @@ model Project {
   paymentAddress        String // Payment receiving address (used when receiveMode is base)
   receiveMode           String?  @default("base") // "base" = Base only; "any_chain" = accept USDC on Base + Arc, receive at unifiedReceiveAddress
   unifiedReceiveAddress String? // When receiveMode is any_chain: address that receives funds on any chain
+  suiAddress            String? // Optional: receive SUI payments at this Sui address (for Sui hackathon / ecosystem)
   developer              Developer        @relation(fields: [developerId], references: [id])
   developerId            String
   pricingRules    PricingRule[] // Project's pricing rules

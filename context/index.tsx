@@ -6,6 +6,13 @@ import { createAppKit } from "@reown/appkit/react";
 import { baseSepolia } from "@reown/appkit/networks";
 import React, { type ReactNode } from "react";
 import { cookieToInitialState, WagmiProvider, type Config } from "wagmi";
+import {
+	createNetworkConfig,
+	SuiClientProvider,
+	WalletProvider,
+} from "@mysten/dapp-kit";
+import { getJsonRpcFullnodeUrl } from "@mysten/sui/jsonRpc";
+import { getSuiNetwork } from "@/lib/x402/payment-config";
 
 // Set up queryClient with shared refetch policy
 const queryClient = new QueryClient({
@@ -41,6 +48,11 @@ createAppKit({
 	},
 });
 
+const { networkConfig: suiNetworkConfig } = createNetworkConfig({
+	mainnet: { url: getJsonRpcFullnodeUrl("mainnet"), network: "mainnet" },
+	testnet: { url: getJsonRpcFullnodeUrl("testnet"), network: "testnet" },
+});
+
 function ContextProvider({
 	children,
 	cookies,
@@ -52,6 +64,7 @@ function ContextProvider({
 		wagmiAdapter.wagmiConfig as Config,
 		cookies,
 	);
+	const defaultSuiNetwork = getSuiNetwork();
 
 	return (
 		<WagmiProvider
@@ -59,7 +72,12 @@ function ContextProvider({
 			initialState={initialState}
 		>
 			<QueryClientProvider client={queryClient}>
-				{children}
+				<SuiClientProvider
+					networks={suiNetworkConfig}
+					defaultNetwork={defaultSuiNetwork}
+				>
+					<WalletProvider>{children}</WalletProvider>
+				</SuiClientProvider>
 			</QueryClientProvider>
 		</WagmiProvider>
 	);

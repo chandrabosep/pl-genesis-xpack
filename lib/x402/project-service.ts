@@ -36,6 +36,7 @@ export async function listProjects(walletAddress: string): Promise<ProjectSummar
 		createdAt: p.createdAt.toISOString(),
 		receiveMode: p.receiveMode ?? null,
 		unifiedReceiveAddress: p.unifiedReceiveAddress ?? null,
+		suiAddress: p.suiAddress ?? null,
 	}));
 }
 
@@ -81,6 +82,7 @@ export async function getProjectById(
 		createdAt: project.createdAt.toISOString(),
 		receiveMode: project.receiveMode ?? null,
 		unifiedReceiveAddress: project.unifiedReceiveAddress ?? null,
+		suiAddress: project.suiAddress ?? null,
 	};
 }
 
@@ -96,13 +98,20 @@ export async function createProject(
 		update: {},
 	});
 
+	const isSuiOnly = body.receiveMode === "sui";
+	const paymentAddress =
+		isSuiOnly && !body.paymentAddress?.trim()
+			? "0x0000000000000000000000000000000000000000"
+			: (body.paymentAddress ?? "").trim();
+
 	const project = await prisma.project.create({
 		data: {
 			name: body.name,
 			pricingModel: body.pricingModel,
-			paymentAddress: body.paymentAddress,
+			paymentAddress: paymentAddress || "0x0000000000000000000000000000000000000000",
 			receiveMode: body.receiveMode ?? "base",
 			unifiedReceiveAddress: body.unifiedReceiveAddress?.trim() || null,
+			suiAddress: body.suiAddress?.trim() || null,
 			developerId: developer.id,
 		},
 	});
@@ -175,8 +184,9 @@ export async function rotateApiKey(projectId: string, walletAddress: string) {
 
 export type UpdateProjectParams = {
 	paymentAddress?: string;
-	receiveMode?: "base" | "any_chain";
+	receiveMode?: "base" | "any_chain" | "sui";
 	unifiedReceiveAddress?: string | null;
+	suiAddress?: string | null;
 };
 
 export async function updateProject(
@@ -202,10 +212,16 @@ export async function updateProject(
 		throw new Error("Project not found");
 	}
 
-	const data: { paymentAddress?: string; receiveMode?: string; unifiedReceiveAddress?: string | null } = {};
+	const data: {
+		paymentAddress?: string;
+		receiveMode?: string;
+		unifiedReceiveAddress?: string | null;
+		suiAddress?: string | null;
+	} = {};
 	if (updates.paymentAddress !== undefined) data.paymentAddress = updates.paymentAddress;
 	if (updates.receiveMode !== undefined) data.receiveMode = updates.receiveMode;
 	if (updates.unifiedReceiveAddress !== undefined) data.unifiedReceiveAddress = updates.unifiedReceiveAddress?.trim() || null;
+	if (updates.suiAddress !== undefined) data.suiAddress = updates.suiAddress?.trim() || null;
 
 	await prisma.project.update({
 		where: { id: projectId },

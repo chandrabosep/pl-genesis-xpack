@@ -227,3 +227,66 @@ export function getRpcUrls(chainId: number): string[] {
 export function getUsdcAddress(chainId: number): string | undefined {
 	return getChainConfig(chainId)?.usdcAddress;
 }
+
+// --- Sui (non-EVM) payment support ---
+
+export type SuiNetwork = "mainnet" | "testnet";
+
+const SUI_MAINNET_RPC_DEFAULT = "https://fullnode.mainnet.sui.io:443";
+const SUI_TESTNET_RPC_DEFAULT = "https://fullnode.testnet.sui.io:443";
+
+/**
+ * Current Sui network for payments.
+ * Set SUI_NETWORK=testnet or NEXT_PUBLIC_SUI_NETWORK=testnet to use testnet (e.g. for testing).
+ */
+export function getSuiNetwork(): SuiNetwork {
+	const v = process.env.SUI_NETWORK ?? process.env.NEXT_PUBLIC_SUI_NETWORK;
+	if (v === "testnet") return "testnet";
+	return "mainnet";
+}
+
+/**
+ * Sui RPC URL for the current network (used for transaction verification).
+ * Override with SUI_RPC_URL / NEXT_PUBLIC_SUI_RPC_URL for any custom RPC.
+ */
+export function getSuiRpcUrl(): string {
+	const custom = process.env.SUI_RPC_URL ?? process.env.NEXT_PUBLIC_SUI_RPC_URL;
+	if (custom && typeof custom === "string" && custom.trim().length > 0) {
+		return custom.trim();
+	}
+	return getSuiNetwork() === "testnet" ? SUI_TESTNET_RPC_DEFAULT : SUI_MAINNET_RPC_DEFAULT;
+}
+
+/** @deprecated Use getSuiRpcUrl() and getSuiNetwork() instead. Kept for backwards compatibility. */
+export const SUI_MAINNET_RPC =
+	process.env.SUI_RPC_URL ??
+	process.env.NEXT_PUBLIC_SUI_RPC_URL ??
+	SUI_MAINNET_RPC_DEFAULT;
+
+/** SUI token decimals (native SUI). */
+export const SUI_DECIMALS = 9;
+
+/** SUI symbol for display. */
+export const SUI_SYMBOL = "SUI";
+
+/**
+ * Amount of SUI to request for a given USD price.
+ * Uses SUI_PRICE_USD env (e.g. 2.5) to convert; if unset, uses price as SUI amount (e.g. 10 USD → 10 SUI for testing).
+ */
+export function priceToSuiAmount(priceUsd: number): string {
+	const suiPriceUsd = process.env.SUI_PRICE_USD ?? process.env.NEXT_PUBLIC_SUI_PRICE_USD;
+	const amount =
+		suiPriceUsd != null && Number.isFinite(Number(suiPriceUsd)) && Number(suiPriceUsd) > 0
+			? priceUsd / Number(suiPriceUsd)
+			: priceUsd;
+	// Format with up to 9 decimals, no trailing zeros
+	const fixed = amount.toFixed(SUI_DECIMALS);
+	return parseFloat(fixed).toString();
+}
+
+/** Validate Sui address (0x + 64 hex chars). */
+export function isValidSuiAddress(addr: string): boolean {
+	if (!addr || typeof addr !== "string") return false;
+	const trimmed = addr.trim();
+	return /^0x[a-fA-F0-9]{64}$/.test(trimmed);
+}

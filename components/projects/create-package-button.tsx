@@ -30,8 +30,9 @@ export function CreatePackageButton({
 	const [price, setPrice] = useState("0.1");
 	const [paymentAddress, setPaymentAddress] = useState("");
 	const [pricingModel, setPricingModel] = useState<PricingModel>("per_device");
-	const [receiveMode, setReceiveMode] = useState<"base" | "any_chain">("base");
+	const [receiveMode, setReceiveMode] = useState<"base" | "any_chain" | "sui">("base");
 	const [unifiedReceiveAddress, setUnifiedReceiveAddress] = useState("");
+	const [suiAddress, setSuiAddress] = useState("");
 
 	const createProject = useCreateProjectMutation(walletAddress, {
 		onSuccess: (project) => {
@@ -42,6 +43,7 @@ export function CreatePackageButton({
 			setPricingModel("per_device");
 			setReceiveMode("base");
 			setUnifiedReceiveAddress("");
+			setSuiAddress("");
 			onCreated();
 			router.push(`/projects/${project.id}`);
 		},
@@ -53,6 +55,16 @@ export function CreatePackageButton({
 	const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
 		e.preventDefault();
 		setMessage("");
+		if (receiveMode === "sui") {
+			createProject.mutate({
+				name,
+				pricingModel,
+				price: Number(price),
+				receiveMode: "sui",
+				suiAddress: suiAddress.trim(),
+			});
+			return;
+		}
 		const address = receiveMode === "any_chain" ? unifiedReceiveAddress.trim() || paymentAddress : paymentAddress;
 		createProject.mutate({
 			name,
@@ -99,6 +111,7 @@ export function CreatePackageButton({
 					pricingModel={pricingModel}
 					receiveMode={receiveMode}
 					unifiedReceiveAddress={unifiedReceiveAddress}
+					suiAddress={suiAddress}
 					onNameChange={setName}
 					onPriceChange={setPrice}
 					onPaymentAddressChange={setPaymentAddress}
@@ -106,8 +119,10 @@ export function CreatePackageButton({
 					onReceiveModeChange={(mode) => {
 						setReceiveMode(mode);
 						if (mode === "any_chain" && !unifiedReceiveAddress) setUnifiedReceiveAddress(paymentAddress);
+						if (mode === "sui") setSuiAddress("");
 					}}
 					onUnifiedReceiveAddressChange={setUnifiedReceiveAddress}
+					onSuiAddressChange={setSuiAddress}
 					onSubmit={handleSubmit}
 				/>
 				{createProject.isPending ? (

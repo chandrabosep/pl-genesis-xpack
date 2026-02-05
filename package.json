@@ -10,6 +10,8 @@
   },
   "dependencies": {
     "@base-ui/react": "^1.1.0",
+    "@mysten/dapp-kit": "^1.0.1",
+    "@mysten/sui": "^2.2.0",
     "@prisma/adapter-pg": "^7.3.0",
     "@prisma/client": "^7.3.0",
     "@reown/appkit": "^1.8.17",

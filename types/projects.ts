@@ -10,4 +10,6 @@ export interface ProjectSummary {
 	createdAt: string;
 	receiveMode?: string | null;
 	unifiedReceiveAddress?: string | null;
+	/** Optional Sui address to receive SUI payments (Sui hackathon / ecosystem). */
+	suiAddress?: string | null;
 }
