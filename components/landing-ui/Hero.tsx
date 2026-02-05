@@ -4,6 +4,17 @@ import { Button } from "../ui/button";
 import { JetBrains_Mono } from "next/font/google";
 import { useAccount } from "wagmi";
 import Link from "next/link";
+import {
+	Coins,
+	Repeat,
+	Sparkles,
+	Package,
+	Wallet,
+	KeyRound,
+	Zap,
+	LayoutDashboard,
+	Network,
+} from "lucide-react";
 
 const jetBrainsMono = JetBrains_Mono({
 	subsets: ["latin"],
@@ -49,154 +60,149 @@ function Hero() {
 						<div className="flex flex-wrap gap-5 reveal-up">
 							{isConnected ? (
 								<Link href="/dashboard">
-									<Button variant="default" size="lg" className="text-lg w-full h-12 px-4 rounded-sm shadow-sm">Open Dashboard</Button>
+									<Button
+										variant="default"
+										size="lg"
+										className="text-lg w-full h-12 px-4 rounded-sm shadow-sm"
+									>
+										Open Dashboard
+									</Button>
 								</Link>
 							) : (
 								<ConnectButton />
 							)}
 						</div>
 					</div>
-					<div className="lg:col-span-6 relative h-[600px] reveal-up">
-						<div className="absolute top-0 right-0 w-[60%] aspect-4/5 rounded-[2rem] overflow-hidden shadow-2xl border border-gray-200 z-10 bg-white p-6">
-							<div className="space-y-4">
-								<div className="flex items-center justify-between pb-4 border-b border-gray-100">
+					<div className="lg:col-span-6 relative h-[540px] reveal-up">
+						{/* Card 1: Payments we accept — theme: purple/cyan only */}
+						<div className="bg-white absolute top-0 right-0 w-[55%] rounded-2xl z-20 overflow-hidden border bg-linear-to-br from-accent/10 to-accent/5 p-5 border-purple-200 shadow-xl shadow-purple-600/5 transition-all duration-300">
+							<div className="flex items-center gap-2 mb-4">
+								<div className="flex h-9 w-9 items-center justify-center rounded-xl text-purple-600">
+									<Coins className="h-5 w-5" />
+								</div>
+								<div>
 									<h3 className="text-sm font-bold text-gray-900">
-										Connect Wallet
+										Payments we accept
 									</h3>
-									<div className="w-2 h-2 bg-green-500 rounded-full"></div>
+									<p className="text-[11px] text-gray-500">
+										Instant settlement to your wallet
+									</p>
 								</div>
-								<div className="space-y-3">
-									<div className="flex items-center gap-3 p-4 rounded-xl border border-purple-200 bg-purple-50 hover:bg-purple-100 transition-colors cursor-pointer">
-										<div className="w-10 h-10 rounded-full bg-linear-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white font-bold text-xs">
-											M
-										</div>
-										<div>
-											<p className="text-sm font-bold text-gray-900">
-												MetaMask
-											</p>
-											<p className="text-[10px] text-gray-500">
-												Most popular
-											</p>
-										</div>
-									</div>
-									<div className="flex items-center gap-3 p-4 rounded-xl border border-gray-200 hover:bg-gray-50 transition-colors cursor-pointer">
-										<div className="w-10 h-10 rounded-full bg-linear-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white font-bold text-xs">
-											W
-										</div>
-										<div>
-											<p className="text-sm font-bold text-gray-900">
-												WalletConnect
-											</p>
-											<p className="text-[10px] text-gray-500">
-												Mobile wallets
-											</p>
-										</div>
-									</div>
-									<div className="flex items-center gap-3 p-4 rounded-xl border border-gray-200 hover:bg-gray-50 transition-colors cursor-pointer">
-										<div className="w-10 h-10 rounded-full bg-linear-to-br from-purple-400 to-purple-600 flex items-center justify-center text-white font-bold text-xs">
-											C
-										</div>
-										<div>
-											<p className="text-sm font-bold text-gray-900">
-												Coinbase Wallet
-											</p>
-											<p className="text-[10px] text-gray-500">
-												Easy setup
-											</p>
-										</div>
-									</div>
-								</div>
+							</div>
+							<div className="flex flex-wrap gap-2">
+								{["USDC", "SUI","ETH"].map(
+									(symbol) => (
+										<span
+											key={symbol}
+											className="inline-flex items-center px-3 py-2 rounded-lg bg-purple-50 border text-purple-700 text-xs font-semibold border-purple-200 transition-colors"
+										>
+											{symbol}
+										</span>
+									),
+								)}
 							</div>
 						</div>
 
-						{/* <!-- Left Middle Overlapping Image - Package Dashboard --> */}
-						<div className="absolute top-1/4 left-0 w-[50%] aspect-square rounded-[2rem] overflow-hidden shadow-2xl border border-gray-200 z-20 bg-gradient-to-br from-purple-50 to-cyan-50 p-6">
-							<div className="space-y-4">
-								<div className="flex items-center justify-between">
-									<h3 className="text-sm font-bold text-gray-900">
-										My Packages
-									</h3>
-									<span className="text-[10px] uppercase tracking-widest font-bold text-purple-600">
-										3 Active
-									</span>
+						{/* Card 2: Subscription types — same card style as ReuseableCard */}
+						<div className="bg-white absolute top-[14%] left-0 w-[54%] rounded-2xl z-10 overflow-hidden border bg-linear-to-br from-accent/10 to-accent/5 p-5 border-purple-200 shadow-xl shadow-purple-600/5 transition-all duration-300">
+							<div className="flex items-center gap-2 mb-4">
+								<div className="flex h-9 w-9 items-center justify-center rounded-xl text-purple-600">
+									<Repeat className="h-5 w-5" />
 								</div>
-								<div className="space-y-2">
-									<div className="bg-white rounded-xl p-4 border border-gray-200">
-										<div className="flex items-center justify-between mb-2">
-											<p className="font-mono text-xs font-bold text-gray-900">
-												@crypto/auth-sdk
-											</p>
-											<span className="text-[10px] text-green-600 font-bold">
-												Active
-											</span>
-										</div>
-										<div className="flex items-center gap-4 text-[10px] text-gray-500">
-											<span>142 installs</span>
-											<span>$420 earned</span>
-										</div>
-									</div>
-									<div className="bg-white rounded-xl p-4 border border-gray-200">
-										<div className="flex items-center justify-between mb-2">
-											<p className="font-mono text-xs font-bold text-gray-900">
-												@web3/payment-lib
-											</p>
-											<span className="text-[10px] text-green-600 font-bold">
-												Active
-											</span>
-										</div>
-										<div className="flex items-center gap-4 text-[10px] text-gray-500">
-											<span>89 installs</span>
-											<span>$267 earned</span>
-										</div>
-									</div>
-								</div>
+								<h3 className="text-sm font-bold text-gray-900">
+									Subscription types
+								</h3>
 							</div>
+							<ul className="space-y-3">
+								{[
+									{
+										name: "Subscription",
+										desc: "Recurring billing",
+										Icon: Repeat,
+									},
+									{
+										name: "Per user",
+										desc: "GitHub-based licensing",
+										Icon: KeyRound,
+									},
+									{
+										name: "Per device",
+										desc: "Track & bill per device",
+										Icon: Zap,
+									},
+									{
+										name: "One-time",
+										desc: "Single payment access",
+										Icon: Wallet,
+									},
+								].map(({ name, desc, Icon }) => (
+									<li
+										key={name}
+										className="flex items-center gap-3 rounded-xl bg-white/60 py-2.5 px-3 border border-purple-100"
+									>
+										<div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-purple-600">
+											<Icon className="h-4 w-4" />
+										</div>
+										<div className="flex-1 min-w-0">
+											<span className="text-sm font-semibold text-gray-900">
+												{name}
+											</span>
+											<span className="text-[11px] text-gray-500 ml-2">
+												{desc}
+											</span>
+										</div>
+									</li>
+								))}
+							</ul>
 						</div>
 
-						{/* <!-- Bottom Front Overlapping Image - Payment Interface --> */}
-						<div className="absolute bottom-[-5%] left-1/4 w-[40%] aspect-3/4 rounded-[2rem] overflow-hidden shadow-2xl border border-gray-200 z-30 bg-white p-6">
-							<div className="space-y-4">
-								<div className="text-center pb-4 border-b border-gray-100">
-									<p className="text-[10px] uppercase tracking-widest text-gray-500 font-bold mb-2">
-										Total Earnings
-									</p>
-									<p className="text-3xl font-bold text-gray-900">
-										$687
-									</p>
-									<p className="text-xs text-gray-500 mt-1">
-										≈ 0.42 ETH
+						{/* Card 3: Features — purple/cyan gradient accent, same borders/shadows */}
+						<div className="bg-white absolute bottom-[10%] left-[45%] right-0 w-[50%] rounded-2xl z-30 overflow-hidden border bg-linear-to-br from-accent/10 to-accent/5 p-5 border-purple-200 shadow-xl shadow-purple-600/5 transition-all duration-300">
+							<div className="flex items-center gap-2 mb-3 mt-1">
+								<div className="flex h-9 w-9 items-center justify-center rounded-xl text-purple-600">
+									<Sparkles className="h-5 w-5" />
+								</div>
+								<div>
+									<h3 className="text-sm font-bold text-gray-900">
+										Our features
+									</h3>
+									<p className="text-[11px] text-gray-500">
+										Everything to monetize your code
 									</p>
 								</div>
-								<div className="space-y-2">
-									<div className="flex items-center justify-between py-2 border-b border-gray-50">
-										<span className="text-xs text-gray-600">
-											This month
-										</span>
-										<span className="text-xs font-bold text-gray-900">
-											$142
-										</span>
-									</div>
-									<div className="flex items-center justify-between py-2 border-b border-gray-50">
-										<span className="text-xs text-gray-600">
-											Active subs
-										</span>
-										<span className="text-xs font-bold text-gray-900">
-											23
-										</span>
-									</div>
-									<div className="flex items-center justify-between py-2">
-										<span className="text-xs text-gray-600">
-											Devices
-										</span>
-										<span className="text-xs font-bold text-gray-900">
-											67
-										</span>
-									</div>
-								</div>
-								<button className="w-full py-3 rounded-xl bg-linear-to-r from-purple-600 to-purple-700 text-white text-xs font-bold hover:from-purple-700 hover:to-purple-800 transition-all">
-									Withdraw
-								</button>
 							</div>
+							<ul className="grid gap-2">
+								{[
+									{
+										text: "Monetize native npm packages",
+										Icon: LayoutDashboard,
+									},
+									{
+										text: "USDC (EVM) + SUI payments",
+										Icon: Package,
+									},
+									{
+										text: "Multi-chain & Circle Gateway payouts",
+										Icon: Network,
+									},
+									// {
+									// 	text: "Per-device, per-user & subscription licensing",
+									// 	Icon: KeyRound,
+									// },
+								].map(({ text, Icon }) => (
+									<li
+										key={text}
+										className="flex items-center gap-3 rounded-lg py-2 px-2.5 hover:bg-white/50 transition-colors"
+									>
+										<div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-purple-600">
+											<Icon className="h-3.5 w-3.5" />
+										</div>
+										<span className="text-sm text-gray-700">
+											{text}
+										</span>
+									</li>
+								))}
+							</ul>
 						</div>
 					</div>
 				</div>
