@@ -1,4 +1,4 @@
-import { getRpcUrl } from "@/lib/x402/payment-config";
+import { getRpcUrls } from "@/lib/x402/payment-config";
 import { keccak256, toBytes } from "viem";
 
 /** ERC20 Transfer(address,address,uint256) topic0 */
@@ -12,6 +12,7 @@ export type VerifyOnChainResult =
 /**
  * Verify an ERC20 transfer on-chain: tx succeeded and a Transfer log exists
  * to the expected recipient with at least the expected amount.
+ * Tries fallback RPC URLs (e.g. for Sonic Testnet) when the primary fails.
  */
 export async function verifyTransferOnChain(
 	chainId: number,
@@ -20,9 +21,30 @@ export async function verifyTransferOnChain(
 	expectedAmountUnits: bigint,
 	tokenAddress: string,
 ): Promise<VerifyOnChainResult> {
-	const rpcUrl = getRpcUrl(chainId);
-	const receipt = await getTransactionReceipt(rpcUrl, transactionHash);
+	const rpcUrls = getRpcUrls(chainId);
+	let lastError: Error | null = null;
+	for (const rpcUrl of rpcUrls) {
+		try {
+			const receipt = await getTransactionReceipt(rpcUrl, transactionHash);
+			if (receipt != null) {
+				return checkReceipt(receipt, recipient, expectedAmountUnits, tokenAddress);
+			}
+		} catch (e) {
+			lastError = e instanceof Error ? e : new Error(String(e));
+		}
+	}
+	if (lastError) {
+		return { verified: false, reason: lastError.message ?? "RPC error" };
+	}
+	return { verified: false, reason: "Transaction not found" };
+}
 
+function checkReceipt(
+	receipt: Receipt,
+	recipient: string,
+	expectedAmountUnits: bigint,
+	tokenAddress: string,
+): VerifyOnChainResult {
 	if (!receipt) {
 		return { verified: false, reason: "Transaction not found" };
 	}

@@ -42,12 +42,36 @@ export interface ChainConfig {
 	usdcAddress: string;
 }
 
+/** Infura project ID from env. When set, Infura RPC is used for all supported chains (Ethereum Sepolia, Base Sepolia, Sonic Testnet, etc.). */
+function getInfuraProjectId(): string | undefined {
+	const id = process.env.INFURA_PROJECT_ID ?? process.env.NEXT_PUBLIC_INFURA_PROJECT_ID;
+	return id && typeof id === "string" && id.trim().length > 0 ? id.trim() : undefined;
+}
+
+/** Infura network slug -> RPC URL. Same project ID works for all networks in the dashboard. */
+function infuraRpcUrl(networkSlug: string): string {
+	const projectId = getInfuraProjectId();
+	if (!projectId) return "";
+	return `https://${networkSlug}.infura.io/v3/${projectId}`;
+}
+
 const BASE_SEPOLIA_RPC_DEFAULT = "https://sepolia.base.org";
-const ARC_TESTNET_RPC_DEFAULT = "https://arc-testnet.drpc.org";
+/** Official Arc testnet RPC (prefer over drpc.org which can return "too many errors"). */
+const ARC_TESTNET_RPC_DEFAULT = "https://rpc.testnet.arc.network";
 const ETHEREUM_SEPOLIA_RPC_DEFAULT = "https://rpc.sepolia.org";
-const AVALANCHE_FUJI_RPC_DEFAULT = "https://api.avax-test.network/ext/bc/C/rpc";
+const AVALANCHE_FUJI_RPC_DEFAULTS = [
+	"https://api.avax-test.network/ext/bc/C/rpc",
+	"https://avalanche-fuji.drpc.org",
+	"https://avalanche-fuji-c-chain-rpc.publicnode.com",
+	"https://ava-testnet.public.blastapi.io/ext/bc/C/rpc",
+	"https://endpoints.omniatech.io/v1/avax/fuji/public",
+];
 const WORLD_CHAIN_SEPOLIA_RPC_DEFAULT = "https://worldchain-sepolia.g.alchemy.com/public";
-const SONIC_TESTNET_RPC_DEFAULT = "https://testnet.soniclabs.com";
+const SONIC_TESTNET_RPC_DEFAULTS = [
+	"https://testnet.soniclabs.com",
+	"https://64165.rpc.thirdweb.com",
+	"https://rpc.testnet.soniclabs.com",
+];
 const SEI_ATLANTIC_RPC_DEFAULT = "https://evm.atlantic-2.seinetwork.io";
 const HYPEREVM_TESTNET_RPC_DEFAULT = "https://testnet.rpc.hyperlane.xyz";
 
@@ -56,25 +80,37 @@ export const SUPPORTED_CHAINS: ChainConfig[] = [
 	{
 		chainId: ETHEREUM_SEPOLIA_CHAIN_ID,
 		name: "Ethereum Sepolia",
-		rpcUrl: process.env.ETHEREUM_SEPOLIA_RPC ?? process.env.NEXT_PUBLIC_ETHEREUM_SEPOLIA_RPC ?? ETHEREUM_SEPOLIA_RPC_DEFAULT,
+		rpcUrl:
+			process.env.ETHEREUM_SEPOLIA_RPC ??
+			process.env.NEXT_PUBLIC_ETHEREUM_SEPOLIA_RPC ??
+			(infuraRpcUrl("sepolia") || ETHEREUM_SEPOLIA_RPC_DEFAULT),
 		usdcAddress: "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238",
 	},
 	{
 		chainId: AVALANCHE_FUJI_CHAIN_ID,
 		name: "Avalanche Fuji",
-		rpcUrl: process.env.AVALANCHE_FUJI_RPC ?? process.env.NEXT_PUBLIC_AVALANCHE_FUJI_RPC ?? AVALANCHE_FUJI_RPC_DEFAULT,
+		rpcUrl:
+			process.env.AVALANCHE_FUJI_RPC ??
+			process.env.NEXT_PUBLIC_AVALANCHE_FUJI_RPC ??
+			(infuraRpcUrl("avalanche-fuji") || AVALANCHE_FUJI_RPC_DEFAULTS[0]),
 		usdcAddress: "0x5425890298aed601595a70AB815c96711a31Bc65",
 	},
 	{
 		chainId: BASE_SEPOLIA_CHAIN_ID,
 		name: "Base Sepolia",
-		rpcUrl: process.env.RPC_URL ?? process.env.NEXT_PUBLIC_RPC_URL ?? BASE_SEPOLIA_RPC_DEFAULT,
+		rpcUrl:
+			process.env.RPC_URL ??
+			process.env.NEXT_PUBLIC_RPC_URL ??
+			(infuraRpcUrl("base-sepolia") || BASE_SEPOLIA_RPC_DEFAULT),
 		usdcAddress: process.env.NEXT_PUBLIC_PAYMENT_TOKEN_ADDRESS ?? "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
 	},
 	{
 		chainId: SONIC_TESTNET_CHAIN_ID,
 		name: "Sonic Testnet",
-		rpcUrl: process.env.SONIC_TESTNET_RPC ?? process.env.NEXT_PUBLIC_SONIC_TESTNET_RPC ?? SONIC_TESTNET_RPC_DEFAULT,
+		rpcUrl:
+			process.env.SONIC_TESTNET_RPC ??
+			process.env.NEXT_PUBLIC_SONIC_TESTNET_RPC ??
+			(infuraRpcUrl("fantom-sonic-testnet") || SONIC_TESTNET_RPC_DEFAULTS[0]),
 		usdcAddress: "0x0BA304580ee7c9a980CF72e55f5Ed2E9fd30Bc51",
 	},
 	{
@@ -150,13 +186,41 @@ export const PAYMENT_TOKEN_SYMBOL = "USDC";
 
 /**
  * RPC URL for the given chain (for on-chain verification).
+ * Returns the primary URL; use getRpcUrls() to get fallbacks for retries.
  */
 export function getRpcUrl(chainId: number): string {
+	return getRpcUrls(chainId)[0];
+}
+
+/**
+ * Ordered list of RPC URLs for a chain (primary first, then fallbacks).
+ * Use when the primary fails (e.g. Sonic Testnet rate limits).
+ */
+export function getRpcUrls(chainId: number): string[] {
+	if (chainId === SONIC_TESTNET_CHAIN_ID) {
+		const env = process.env.SONIC_TESTNET_RPC ?? process.env.NEXT_PUBLIC_SONIC_TESTNET_RPC;
+		if (env && typeof env === "string" && env.trim().length > 0) {
+			return env.split(",").map((u) => u.trim()).filter(Boolean);
+		}
+		// When Infura project ID is set, use Fantom Sonic Testnet endpoint first
+		const infura = infuraRpcUrl("fantom-sonic-testnet");
+		if (infura) return [infura, ...SONIC_TESTNET_RPC_DEFAULTS];
+		return SONIC_TESTNET_RPC_DEFAULTS;
+	}
+	if (chainId === AVALANCHE_FUJI_CHAIN_ID) {
+		const env = process.env.AVALANCHE_FUJI_RPC ?? process.env.NEXT_PUBLIC_AVALANCHE_FUJI_RPC;
+		if (env && typeof env === "string" && env.trim().length > 0) {
+			return env.split(",").map((u) => u.trim()).filter(Boolean);
+		}
+		const infura = infuraRpcUrl("avalanche-fuji");
+		if (infura) return [infura, ...AVALANCHE_FUJI_RPC_DEFAULTS];
+		return AVALANCHE_FUJI_RPC_DEFAULTS;
+	}
 	const config = getChainConfig(chainId);
-	if (config) return config.rpcUrl;
-	const env = process.env.RPC_URL ?? process.env.NEXT_PUBLIC_RPC_URL;
-	if (env && typeof env === "string" && env.trim().length > 0) return env.trim();
-	return SUPPORTED_CHAINS[0]?.rpcUrl ?? "https://sepolia.base.org";
+	if (config) return [config.rpcUrl];
+	const fallback = process.env.RPC_URL ?? process.env.NEXT_PUBLIC_RPC_URL;
+	if (fallback && typeof fallback === "string" && fallback.trim().length > 0) return [fallback.trim()];
+	return SUPPORTED_CHAINS[0] ? [SUPPORTED_CHAINS[0].rpcUrl] : ["https://sepolia.base.org"];
 }
 
 /** Get USDC token address for a chain. */

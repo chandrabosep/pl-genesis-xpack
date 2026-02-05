@@ -74,6 +74,12 @@ const ERC20_TRANSFER_ABI = [
 	},
 ] as const;
 
+/** Explicit gas limits to avoid RPC gas estimation returning null (viem destructure error). */
+const GAS_ERC20_APPROVE = BigInt(50_000);
+const GAS_ERC20_TRANSFER = BigInt(65_000);
+const GAS_GATEWAY_DEPOSIT = BigInt(100_000);
+const GAS_GATEWAY_MINT = BigInt(300_000);
+
 const BASE_SEPOLIA_CHAIN_ID = 84532;
 const ARC_TESTNET_CHAIN_ID = 5042002;
 
@@ -84,6 +90,24 @@ const GATEWAY_DEPOSIT_AMOUNT_USDC = 2;
 const GATEWAY_DEPOSIT_AMOUNT_UNITS = BigInt(
 	GATEWAY_DEPOSIT_AMOUNT_USDC * 1_000_000,
 );
+
+/** True when the wallet user rejected/cancelled the transaction (e.g. MetaMask "Reject"). */
+function isUserRejectedRequestError(err: unknown): boolean {
+	if (!err || typeof err !== "object") return false;
+	const msg =
+		"message" in err && typeof (err as { message?: string }).message === "string"
+			? (err as { message: string }).message
+			: "";
+	const name = "name" in err ? String((err as { name?: string }).name) : "";
+	const code = "code" in err ? String((err as { code?: string }).code) : "";
+	return (
+		code === "ACTION_REJECTED" ||
+		name === "UserRejectedRequestError" ||
+		/user rejected the request/i.test(msg) ||
+		/user denied transaction signature/i.test(msg) ||
+		/request was rejected/i.test(msg)
+	);
+}
 
 type PaymentOption = {
 	chainId: number;
@@ -220,6 +244,14 @@ export default function PayPage() {
 		);
 	}, [txHash]);
 
+	// When any write fails (rejected or reverted), clear gateway deposit flow so "Deposit" / "Confirm approve" is unblocked and retryable
+	useEffect(() => {
+		if (!isWriteError || !writeError) return;
+		gatewayDepositRef.current = null;
+		setGatewayError(null);
+		setGatewayStep("idle");
+	}, [isWriteError, writeError]);
+
 	// Gateway deposit flow: after approve confirms, run deposit; after deposit confirms, mark done
 	useEffect(() => {
 		if (!isReceiptSuccess || !txHash || !gatewayDepositRef.current) return;
@@ -231,6 +263,7 @@ export default function PayPage() {
 				abi: GATEWAY_DEPOSIT_ABI,
 				functionName: "deposit",
 				args: [next.usdcAddress as `0x${string}`, next.amountUnits],
+				gas: GAS_GATEWAY_DEPOSIT,
 			});
 		} else {
 			gatewayDepositRef.current = null;
@@ -314,6 +347,7 @@ export default function PayPage() {
 			abi: ERC20_TRANSFER_ABI,
 			functionName: "transfer",
 			args: [recipient as `0x${string}`, BigInt(amountUnits)],
+			gas: GAS_ERC20_TRANSFER,
 		});
 	}, [
 		state,
@@ -393,6 +427,7 @@ export default function PayPage() {
 					attestationHex as `0x${string}`,
 					sigHex as `0x${string}`,
 				],
+				gas: GAS_GATEWAY_MINT,
 			});
 		} catch (err) {
 			setGatewayError(
@@ -432,6 +467,7 @@ export default function PayPage() {
 				abi: ERC20_APPROVE_ABI,
 				functionName: "approve",
 				args: [GATEWAY_WALLET_ADDRESS, GATEWAY_DEPOSIT_AMOUNT_UNITS],
+				gas: GAS_ERC20_APPROVE,
 			});
 		} catch (err) {
 			gatewayDepositRef.current = null;
@@ -821,20 +857,59 @@ export default function PayPage() {
 						</p>
 					)}
 
-					{/* Payment failed (ready + write error) */}
+					{/* Payment failed or cancelled (ready + write error) */}
 					{state.status === "ready" && isWriteError && (
 						<div
-							className="flex items-start gap-3 rounded-2xl border border-destructive/30 bg-destructive/5 px-5 py-4"
+							className={`flex items-start gap-3 rounded-2xl border px-5 py-4 ${
+								isUserRejectedRequestError(writeError)
+									? "border-muted-foreground/30 bg-muted/50"
+									: "border-destructive/30 bg-destructive/5"
+							}`}
 							role="alert"
 						>
-							<AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
+							<AlertCircle
+								className={`mt-0.5 h-5 w-5 shrink-0 ${
+									isUserRejectedRequestError(writeError)
+										? "text-muted-foreground"
+										: "text-destructive"
+								}`}
+							/>
 							<div>
-								<p className="font-medium text-destructive">
-									Payment failed
+								<p
+									className={
+										isUserRejectedRequestError(writeError)
+											? "font-medium text-muted-foreground"
+											: "font-medium text-destructive"
+									}
+								>
+									{isUserRejectedRequestError(writeError)
+										? "Transaction cancelled"
+										: "Payment failed"}
 								</p>
-								<p className="mt-1 text-sm text-destructive/90">
-									{writeError?.message ??
-										"Transaction was rejected or failed. Check your balance and try again."}
+								<p
+									className={`mt-1 text-sm ${
+										isUserRejectedRequestError(writeError)
+											? "text-muted-foreground"
+											: "text-destructive/90"
+									}`}
+								>
+									{(() => {
+										if (isUserRejectedRequestError(writeError)) {
+											return "You can try again when ready.";
+										}
+										const msg = writeError?.message ?? "";
+										// Gas estimation failed (e.g. RPC returned null) — show friendly message
+										if (
+											msg.includes("gasLimit") ||
+											msg.includes("destructure")
+										) {
+											return "Transaction could not be prepared. Check your network connection and balance, then try again.";
+										}
+										return (
+											msg ||
+											"Transaction was rejected or failed. Check your balance and try again."
+										);
+									})()}
 								</p>
 							</div>
 						</div>
