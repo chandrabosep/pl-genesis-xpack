@@ -212,11 +212,14 @@ function serializeBurnIntentForApi(msg: BurnIntentMessage): Record<string, unkno
 /**
  * Fetch Gateway unified USDC balances for a depositor (optional, for UI).
  */
+/** All Gateway domain IDs (for balance queries across all supported chains). */
+export const GATEWAY_DOMAIN_IDS_LIST = [0, 1, 6, 13, 14, 16, 19, 26] as const;
+
 export async function getGatewayBalances(params: {
 	depositor: string;
 	domains?: number[];
 }): Promise<{ domain: number; balance: string }[]> {
-	const { depositor, domains = [6, 26] } = params;
+	const { depositor, domains = [...GATEWAY_DOMAIN_IDS_LIST] } = params;
 	const body = {
 		token: "USDC",
 		sources: domains.map((domain) => ({ domain, depositor })),

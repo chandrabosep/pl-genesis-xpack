@@ -2,10 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma/client";
 import { requestAttestation, buildBurnIntentTypedData } from "@/lib/circle/gateway";
 import { getGatewayDomainId } from "@/lib/circle/gateway-config";
-import { ARC_TESTNET_CHAIN_ID, BASE_SEPOLIA_CHAIN_ID } from "@/lib/x402/payment-config";
+import {
+	ARC_TESTNET_CHAIN_ID,
+	BASE_SEPOLIA_CHAIN_ID,
+	SUPPORTED_CHAINS,
+	isSupportedChain,
+} from "@/lib/x402/payment-config";
 import { parseUnits, pad } from "viem";
-
-const ARC_DOMAIN = getGatewayDomainId(ARC_TESTNET_CHAIN_ID);
 
 /** Serialize typed data message for JSON (bigint -> string). */
 function serializeTypedDataForClient(typedData: {
@@ -26,16 +29,20 @@ function serializeTypedDataForClient(typedData: {
 
 /**
  * GET: Return burn intent typed data for this session (client signs it, then POSTs to get attestation).
- * Query: session, depositor (payer's 0x address), sourceChainId (optional, default Base Sepolia).
+ * Query: session, depositor (payer's 0x address), sourceChainId (optional, default Base Sepolia), destinationChainId (optional, default Arc).
  */
 export async function GET(request: NextRequest) {
 	try {
 		const sessionToken = request.nextUrl.searchParams.get("session")?.trim();
 		const depositor = request.nextUrl.searchParams.get("depositor")?.trim();
 		const sourceChainIdParam = request.nextUrl.searchParams.get("sourceChainId");
+		const destinationChainIdParam = request.nextUrl.searchParams.get("destinationChainId");
 		const sourceChainId = sourceChainIdParam
 			? Number(sourceChainIdParam)
 			: BASE_SEPOLIA_CHAIN_ID;
+		const destinationChainId = destinationChainIdParam
+			? Number(destinationChainIdParam)
+			: ARC_TESTNET_CHAIN_ID;
 
 		if (!sessionToken || !depositor) {
 			return NextResponse.json(
@@ -46,6 +53,24 @@ export async function GET(request: NextRequest) {
 		if (!/^0x[a-fA-F0-9]{40}$/.test(depositor)) {
 			return NextResponse.json(
 				{ error: "depositor must be a valid 0x address" },
+				{ status: 400 }
+			);
+		}
+		if (!isSupportedChain(sourceChainId)) {
+			return NextResponse.json(
+				{ error: `Unsupported source chain: ${sourceChainId}` },
+				{ status: 400 }
+			);
+		}
+		if (!isSupportedChain(destinationChainId)) {
+			return NextResponse.json(
+				{ error: `Unsupported destination chain: ${destinationChainId}` },
+				{ status: 400 }
+			);
+		}
+		if (getGatewayDomainId(destinationChainId) == null) {
+			return NextResponse.json(
+				{ error: "Destination chain is not a Gateway chain" },
 				{ status: 400 }
 			);
 		}
@@ -79,7 +104,7 @@ export async function GET(request: NextRequest) {
 
 		const { typedData, message } = buildBurnIntentTypedData({
 			sourceChainId,
-			destinationChainId: ARC_TESTNET_CHAIN_ID,
+			destinationChainId,
 			sourceDepositor: depositor,
 			destinationRecipient: recipient,
 			valueUnits: expectedUnits,
@@ -93,7 +118,7 @@ export async function GET(request: NextRequest) {
 					typeof v === "bigint" ? v.toString() : v,
 				),
 			),
-			destinationChainId: ARC_TESTNET_CHAIN_ID,
+			destinationChainId,
 			recipient,
 			amountUnits: expectedUnits.toString(),
 			sourceChainId,
@@ -165,14 +190,18 @@ export async function POST(request: NextRequest) {
 		const price = project.pricingRules[0]?.amount ?? 0;
 		const expectedUnits = parseUnits(String(price), 6);
 
-		// Validate burn intent: destination Arc, recipient matches, value matches
+		// Validate burn intent: destination must be a supported Gateway chain, recipient matches, value matches
 		const destDomain = burnIntent.spec?.destinationDomain;
 		const destRecipientBytes = burnIntent.spec?.destinationRecipient;
 		const valueStr = burnIntent.spec?.value;
 
-		if (destDomain !== ARC_DOMAIN) {
+		// Resolve expected destination chain from domain (any supported chain with this domain)
+		const expectedDestChainId = SUPPORTED_CHAINS.find(
+			(c) => getGatewayDomainId(c.chainId) === destDomain
+		)?.chainId ?? null;
+		if (expectedDestChainId == null) {
 			return NextResponse.json(
-				{ error: "Destination must be Arc for this payment" },
+				{ error: "Unsupported destination domain for this payment" },
 				{ status: 400 }
 			);
 		}
@@ -236,7 +265,7 @@ export async function POST(request: NextRequest) {
 		return NextResponse.json({
 			attestation: result.attestation,
 			signature: result.signature,
-			destinationChainId: ARC_TESTNET_CHAIN_ID,
+			destinationChainId: expectedDestChainId,
 		});
 	} catch (err) {
 		console.error("[gateway/attestation]", err);
@@ -245,7 +274,7 @@ export async function POST(request: NextRequest) {
 			return NextResponse.json(
 				{
 					error:
-						"You don’t have enough USDC in your Circle Gateway balance. Deposit USDC into the Gateway Wallet on Base Sepolia or Arc first (e.g. via Circle Faucet and Gateway deposit).",
+						"You don’t have enough USDC in your Circle Gateway balance. Deposit USDC into the Gateway Wallet on any supported chain first (e.g. via Circle Faucet and Gateway deposit).",
 					helpUrl: "https://developers.circle.com/gateway/quickstarts/unified-balance",
 				},
 				{ status: 400 }

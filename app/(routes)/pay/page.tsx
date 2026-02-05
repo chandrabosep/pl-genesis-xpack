@@ -11,9 +11,14 @@ import {
 	useSignTypedData,
 } from "wagmi";
 import { useAppKit } from "@reown/appkit/react";
+import { AlertCircle, Wallet, Hash } from "lucide-react";
+import { SUPPORTED_CHAINS } from "@/lib/x402/payment-config";
+import { CopyButton } from "@/components/ui/copy-button";
+import { Button } from "@/components/ui/button";
 
 /** Circle Gateway Minter on Arc (and other EVM testnets). */
-const GATEWAY_MINTER_ADDRESS = "0x0022222ABE238Cc2C7Bb1f21003F0a260052475B" as const;
+const GATEWAY_MINTER_ADDRESS =
+	"0x0022222ABE238Cc2C7Bb1f21003F0a260052475B" as const;
 const GATEWAY_MINTER_ABI = [
 	{
 		type: "function" as const,
@@ -28,7 +33,8 @@ const GATEWAY_MINTER_ABI = [
 ] as const;
 
 /** Gateway Wallet: deposit your USDC here to get a Gateway balance. Same address on Base Sepolia and Arc. */
-const GATEWAY_WALLET_ADDRESS = "0x0077777d7EBA4688BDeF3E311b846F25870A19B9" as const;
+const GATEWAY_WALLET_ADDRESS =
+	"0x0077777d7EBA4688BDeF3E311b846F25870A19B9" as const;
 const GATEWAY_DEPOSIT_ABI = [
 	{
 		type: "function" as const,
@@ -71,12 +77,13 @@ const ERC20_TRANSFER_ABI = [
 const BASE_SEPOLIA_CHAIN_ID = 84532;
 const ARC_TESTNET_CHAIN_ID = 5042002;
 
-const USDC_BY_CHAIN: Record<number, string> = {
-	[BASE_SEPOLIA_CHAIN_ID]: "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
-	[ARC_TESTNET_CHAIN_ID]: "0x3600000000000000000000000000000000000000",
-};
+const USDC_BY_CHAIN: Record<number, string> = Object.fromEntries(
+	SUPPORTED_CHAINS.map((c) => [c.chainId, c.usdcAddress]),
+);
 const GATEWAY_DEPOSIT_AMOUNT_USDC = 2;
-const GATEWAY_DEPOSIT_AMOUNT_UNITS = BigInt(GATEWAY_DEPOSIT_AMOUNT_USDC * 1_000_000);
+const GATEWAY_DEPOSIT_AMOUNT_UNITS = BigInt(
+	GATEWAY_DEPOSIT_AMOUNT_USDC * 1_000_000,
+);
 
 type PaymentOption = {
 	chainId: number;
@@ -107,7 +114,7 @@ type SessionState =
 	| { status: "invalid"; error: string }
 	| ({ status: "ready" } & ReadyPayload)
 	| ({ status: "confirming" } & ReadyPayload) // tx submitted, waiting for block
-	| ({ status: "verifying" } & ReadyPayload)  // tx mined, checking on our server
+	| ({ status: "verifying" } & ReadyPayload) // tx mined, checking on our server
 	| { status: "verified" }
 	| { status: "verify_error"; error: string };
 
@@ -124,9 +131,33 @@ export default function PayPage() {
 	const [githubSaving, setGithubSaving] = useState(false);
 	const [githubError, setGithubError] = useState<string | null>(null);
 	// Circle Gateway flow: source chain for Gateway balance, then attestation + mint
-	const [gatewaySourceChainId, setGatewaySourceChainId] = useState(BASE_SEPOLIA_CHAIN_ID);
+	const [gatewaySourceChainId, setGatewaySourceChainId] = useState(
+		BASE_SEPOLIA_CHAIN_ID,
+	);
+
+	// When user selects a chain in "Pay with USDC on", use it as gateway source so Pay with Gateway works for that chain
+	useEffect(() => {
+		if (
+			state.status !== "ready" &&
+			state.status !== "confirming" &&
+			state.status !== "verifying"
+		)
+			return;
+		const chainId = "chainId" in state ? state.chainId : undefined;
+		const options =
+			"paymentOptions" in state ? state.paymentOptions : undefined;
+		if (
+			options?.length &&
+			chainId != null &&
+			SUPPORTED_CHAINS.some((c) => c.chainId === chainId)
+		) {
+			setGatewaySourceChainId(chainId);
+		}
+	}, [state]);
 	const [gatewayError, setGatewayError] = useState<string | null>(null);
-	const [gatewayStep, setGatewayStep] = useState<"idle" | "loading" | "sign" | "request" | "mint">("idle");
+	const [gatewayStep, setGatewayStep] = useState<
+		"idle" | "loading" | "sign" | "request" | "mint"
+	>("idle");
 	const [gatewayDepositDone, setGatewayDepositDone] = useState(false);
 	const [gatewayBalance, setGatewayBalance] = useState<string | null>(null);
 	const [gatewayBalanceLoading, setGatewayBalanceLoading] = useState(false);
@@ -210,7 +241,12 @@ export default function PayPage() {
 
 	// Auto-verify only after tx is mined (receipt exists) so our server finds the receipt
 	useEffect(() => {
-		if (!isReceiptSuccess || !receipt || !txHash || !payingForSessionRef.current)
+		if (
+			!isReceiptSuccess ||
+			!receipt ||
+			!txHash ||
+			!payingForSessionRef.current
+		)
 			return;
 		if (gatewayDepositRef.current) return; // let the deposit effect handle it
 		const sessionToken = payingForSessionRef.current;
@@ -218,14 +254,16 @@ export default function PayPage() {
 		payingForSessionRef.current = null;
 		readyPayloadRef.current = null;
 		if (!payload) return;
-		queueMicrotask(() =>
-			setState({ ...payload, status: "verifying" }),
-		);
+		queueMicrotask(() => setState({ ...payload, status: "verifying" }));
 		const chainId = payload.chainId ?? BASE_SEPOLIA_CHAIN_ID;
 		fetch("/api/install/verify", {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({ sessionToken, transactionHash: txHash, chainId }),
+			body: JSON.stringify({
+				sessionToken,
+				transactionHash: txHash,
+				chainId,
+			}),
 		})
 			.then((res) => res.json())
 			.then((result) => {
@@ -277,13 +315,25 @@ export default function PayPage() {
 			functionName: "transfer",
 			args: [recipient as `0x${string}`, BigInt(amountUnits)],
 		});
-	}, [state, isConnected, chain?.id, switchChainAsync, open, writeContract, resetWriteContract]);
+	}, [
+		state,
+		isConnected,
+		chain?.id,
+		switchChainAsync,
+		open,
+		writeContract,
+		resetWriteContract,
+	]);
 
 	const handlePayWithGateway = useCallback(async () => {
 		if (state.status !== "ready" || !walletAddress) return;
 		setGatewayError(null);
 		setGatewayStep("loading");
 		try {
+			// Switch to the selected gateway source chain so the wallet shows the correct network when signing
+			if (chain?.id !== gatewaySourceChainId) {
+				await switchChainAsync({ chainId: gatewaySourceChainId });
+			}
 			const res = await fetch(
 				`/api/circle/gateway/attestation?session=${encodeURIComponent(state.sessionToken)}&depositor=${encodeURIComponent(walletAddress)}&sourceChainId=${gatewaySourceChainId}`,
 			);
@@ -321,23 +371,33 @@ export default function PayPage() {
 				throw new Error(errData.error ?? "Attestation failed");
 			}
 			const { attestation, signature: sig } = await postRes.json();
-			const attestationHex = attestation.startsWith("0x") ? attestation : `0x${attestation}`;
+			const attestationHex = attestation.startsWith("0x")
+				? attestation
+				: `0x${attestation}`;
 			const sigHex = sig.startsWith("0x") ? sig : `0x${sig}`;
 			if (chain?.id !== ARC_TESTNET_CHAIN_ID) {
 				await switchChainAsync({ chainId: ARC_TESTNET_CHAIN_ID });
 			}
 			payingForSessionRef.current = state.sessionToken;
-			readyPayloadRef.current = { ...state, chainId: ARC_TESTNET_CHAIN_ID };
+			readyPayloadRef.current = {
+				...state,
+				chainId: ARC_TESTNET_CHAIN_ID,
+			};
 			setGatewayStep("mint");
 			resetWriteContract?.();
 			writeContract({
 				address: GATEWAY_MINTER_ADDRESS,
 				abi: GATEWAY_MINTER_ABI,
 				functionName: "gatewayMint",
-				args: [attestationHex as `0x${string}`, sigHex as `0x${string}`],
+				args: [
+					attestationHex as `0x${string}`,
+					sigHex as `0x${string}`,
+				],
 			});
 		} catch (err) {
-			setGatewayError(err instanceof Error ? err.message : "Gateway payment failed");
+			setGatewayError(
+				err instanceof Error ? err.message : "Gateway payment failed",
+			);
 			setGatewayStep("idle");
 		}
 	}, [
@@ -375,7 +435,9 @@ export default function PayPage() {
 			});
 		} catch (err) {
 			gatewayDepositRef.current = null;
-			setGatewayError(err instanceof Error ? err.message : "Deposit failed");
+			setGatewayError(
+				err instanceof Error ? err.message : "Deposit failed",
+			);
 		}
 	}, [
 		isConnected,
@@ -387,52 +449,58 @@ export default function PayPage() {
 		resetWriteContract,
 	]);
 
-	const fetchSession = useCallback(async (token: string) => {
-		setState({ status: "loading" });
-		setGithubUsername("");
-		setGithubSaved(false);
-		setGithubError(null);
-		try {
-			const res = await fetch(
-				`/api/install/session?session=${encodeURIComponent(token)}`,
-			);
-			if (!res.ok) {
-				const data = await res.json().catch(() => ({}));
+	const fetchSession = useCallback(
+		async (token: string) => {
+			setState({ status: "loading" });
+			setGithubUsername("");
+			setGithubSaved(false);
+			setGithubError(null);
+			try {
+				const res = await fetch(
+					`/api/install/session?session=${encodeURIComponent(token)}`,
+				);
+				if (!res.ok) {
+					const data = await res.json().catch(() => ({}));
+					setState({
+						status: "invalid",
+						error: data.error ?? "Invalid or expired session",
+					});
+					return;
+				}
+				const data = await res.json();
+				// Pre-fill GitHub from session or from URL (?github=)
+				const fromUrl = searchParams.get("github")?.trim() ?? "";
+				const fromSession = data.githubUsername?.trim() ?? "";
+				const initial = fromSession || fromUrl;
+				setGithubUsername(initial);
+				setGithubSaved(!!fromSession);
+				payingForSessionRef.current = null;
+				setState({
+					status: "ready",
+					price: data.price,
+					address: data.address,
+					projectName: data.projectName,
+					sessionToken: data.sessionToken,
+					paymentUri: data.paymentUri,
+					chainId: data.chainId,
+					currency: data.currency,
+					tokenAddress: data.tokenAddress,
+					amountUnits: data.amountUnits,
+					pricingModel: data.pricingModel,
+					githubUsername: data.githubUsername,
+					githubUserId: data.githubUserId,
+					receiveMode: data.receiveMode,
+					paymentOptions: data.paymentOptions,
+				});
+			} catch {
 				setState({
 					status: "invalid",
-					error: data.error ?? "Invalid or expired session",
+					error: "Failed to load session",
 				});
-				return;
 			}
-			const data = await res.json();
-			// Pre-fill GitHub from session or from URL (?github=)
-			const fromUrl = searchParams.get("github")?.trim() ?? "";
-			const fromSession = data.githubUsername?.trim() ?? "";
-			const initial = fromSession || fromUrl;
-			setGithubUsername(initial);
-			setGithubSaved(!!fromSession);
-			payingForSessionRef.current = null;
-			setState({
-				status: "ready",
-				price: data.price,
-				address: data.address,
-				projectName: data.projectName,
-				sessionToken: data.sessionToken,
-				paymentUri: data.paymentUri,
-				chainId: data.chainId,
-				currency: data.currency,
-				tokenAddress: data.tokenAddress,
-				amountUnits: data.amountUnits,
-				pricingModel: data.pricingModel,
-				githubUsername: data.githubUsername,
-				githubUserId: data.githubUserId,
-				receiveMode: data.receiveMode,
-				paymentOptions: data.paymentOptions,
-			});
-		} catch {
-			setState({ status: "invalid", error: "Failed to load session" });
-		}
-	}, [searchParams]);
+		},
+		[searchParams],
+	);
 
 	useEffect(() => {
 		if (sessionParam?.trim()) {
@@ -451,7 +519,9 @@ export default function PayPage() {
 		if (state.status !== "ready") return;
 		const username = githubUsername.trim();
 		if (!username || !/^[a-zA-Z0-9-]+$/.test(username)) {
-			setGithubError("Enter a valid GitHub username (letters, numbers, hyphens only)");
+			setGithubError(
+				"Enter a valid GitHub username (letters, numbers, hyphens only)",
+			);
 			return;
 		}
 		setGithubError(null);
@@ -515,35 +585,65 @@ export default function PayPage() {
 
 	if (state.status === "loading") {
 		return (
-			<main className="mx-auto max-w-lg space-y-6 p-6">
-				<h1 className="text-2xl font-semibold">Payment</h1>
-				<p className="text-muted-foreground">Loading session…</p>
+			<main className="mx-auto flex min-h-[50vh] max-w-xl flex-col items-center justify-center px-6 py-12">
+				<div className="flex flex-col items-center gap-4">
+					<div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+					<p className="text-sm font-medium text-muted-foreground">
+						Loading payment session…
+					</p>
+				</div>
 			</main>
 		);
 	}
 
 	if (state.status === "invalid") {
 		return (
-			<main className="mx-auto max-w-lg space-y-6 p-6">
-				<h1 className="text-2xl font-semibold">Payment</h1>
-				<div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-destructive">
-					{state.error}
+			<main className="mx-auto max-w-xl px-6 py-12">
+				<div className="rounded-2xl border border-border bg-card p-8 shadow-sm">
+					<h1 className="text-xl font-semibold tracking-tight">
+						Payment link invalid
+					</h1>
+					<p className="mt-2 text-muted-foreground">
+						Use the payment link from the install flow (CLI or
+						docs).
+					</p>
+					<div className="mt-6 rounded-xl border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+						{state.error}
+					</div>
 				</div>
-				<p className="text-sm text-muted-foreground">
-					Use the payment link provided when you ran the install (e.g.
-					from the CLI or docs).
-				</p>
 			</main>
 		);
 	}
 
 	if (state.status === "verified") {
 		return (
-			<main className="mx-auto max-w-lg space-y-6 p-6">
-				<h1 className="text-2xl font-semibold">Payment verified</h1>
-				<div className="rounded-lg border border-green-200 bg-green-50 p-4 text-green-900 dark:border-green-800 dark:bg-green-950 dark:text-green-100">
-					Payment was verified successfully. You can now re-run the
-					install command.
+			<main className="mx-auto max-w-xl px-6 py-12">
+				<div className="rounded-2xl border border-border bg-card p-8 shadow-sm">
+					<div className="flex items-center gap-3">
+						<div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+							<svg
+								className="h-5 w-5"
+								fill="none"
+								viewBox="0 0 24 24"
+								stroke="currentColor"
+								strokeWidth={2}
+							>
+								<path
+									strokeLinecap="round"
+									strokeLinejoin="round"
+									d="M5 13l4 4L19 7"
+								/>
+							</svg>
+						</div>
+						<div>
+							<h1 className="text-xl font-semibold tracking-tight">
+								Payment verified
+							</h1>
+							<p className="mt-0.5 text-sm text-muted-foreground">
+								You can re-run the install command now.
+							</p>
+						</div>
+					</div>
 				</div>
 			</main>
 		);
@@ -551,24 +651,28 @@ export default function PayPage() {
 
 	if (state.status === "verify_error") {
 		return (
-			<main className="mx-auto max-w-lg space-y-6 p-6">
-				<h1 className="text-2xl font-semibold">Payment</h1>
-				<div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-destructive">
-					{state.error}
+			<main className="mx-auto max-w-xl px-6 py-12">
+				<div className="rounded-2xl border border-border bg-card p-8 shadow-sm">
+					<h1 className="text-xl font-semibold tracking-tight">
+						Verification failed
+					</h1>
+					<div className="mt-4 rounded-xl border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+						{state.error}
+					</div>
+					<p className="mt-4 text-sm text-muted-foreground">
+						Check the transaction hash and try again, or open the
+						payment link again for a fresh session.
+					</p>
+					{sessionParam?.trim() && (
+						<button
+							type="button"
+							onClick={() => fetchSession(sessionParam.trim())}
+							className="mt-6 rounded-xl border border-border bg-background px-4 py-2.5 text-sm font-medium hover:bg-muted"
+						>
+							Try again
+						</button>
+					)}
 				</div>
-				<p className="text-sm text-muted-foreground">
-					Check the transaction hash and try again, or open the
-					payment link again to get a fresh session.
-				</p>
-				{sessionParam?.trim() && (
-					<button
-						type="button"
-						onClick={() => fetchSession(sessionParam.trim())}
-						className="rounded-md border bg-background px-4 py-2 text-sm font-medium hover:bg-muted"
-					>
-						Try again
-					</button>
-				)}
 			</main>
 		);
 	}
@@ -582,375 +686,527 @@ export default function PayPage() {
 		return null;
 	const { price, address: recipientAddress, projectName } = state;
 	const isSubscription = state.pricingModel === "subscription";
-	const hasGithub =
-		!!state.githubUsername || githubSaved;
+	const hasGithub = !!state.githubUsername || githubSaved;
 	const subscriptionNeedsGithub = isSubscription && !hasGithub;
 
+	const networkLabel =
+		state.receiveMode === "any_chain"
+			? "Arc (via Gateway)"
+			: state.chainId === ARC_TESTNET_CHAIN_ID
+				? "Arc"
+				: "Base Sepolia";
+	const amountCopyText = `${price} ${state.currency ?? "USDC"}`;
+
 	return (
-		<main className="mx-auto max-w-lg space-y-6 p-6">
-			<h1 className="text-2xl font-semibold">Complete payment</h1>
-			{projectName && (
-				<p className="text-muted-foreground">
-					Pay for:{" "}
-					<span className="font-medium text-foreground">
-						{projectName}
+		<main className="min-h-screen bg-muted/30">
+			<div className="mx-auto max-w-xl px-4 py-4 sm:px-6 sm:py-6">
+				{/* Header */}
+				<header className="mb-4">
+					<h1 className="text-2xl font-semibold tracking-tight text-foreground">
+						Complete payment
+					</h1>
+					{projectName && (
+						<p className="mt-1 text-muted-foreground">
+							Pay for{" "}
+							<span className="font-medium text-foreground">
+								{projectName}
+							</span>
+						</p>
+					)}
+					{isSubscription && (
+						<p className="mt-2 text-sm text-muted-foreground">
+							Subscription is tied to your GitHub identity. After
+							payment you can install from any machine with the
+							same GitHub user.
+						</p>
+					)}
+				</header>
+
+				{/* Step indicator: 1 Review → 2 Pay → 3 Verify (direct) or 1 Review → 2 Pay (Gateway) */}
+				<div
+					className="mb-4 flex items-center justify-center gap-2 rounded-xl bg-card px-4 py-2.5 shadow-sm ring-1 ring-border/50"
+					aria-label="Payment steps"
+				>
+					<span className="flex items-center gap-1.5 text-sm font-medium text-foreground">
+						<span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs text-primary-foreground">
+							1
+						</span>
+						Review
 					</span>
-				</p>
-			)}
-			{isSubscription && (
-				<p className="text-sm text-muted-foreground">
-					Subscription is tied to your GitHub identity. After payment you can install from any machine with the same GitHub user.
-				</p>
-			)}
-			{subscriptionNeedsGithub && (
-				<div className="space-y-2 rounded-lg border bg-muted/30 p-4">
-					<label
-						htmlFor="githubUsername"
-						className="block text-sm font-medium"
-					>
-						GitHub username (required for subscription)
-					</label>
-					<div className="flex gap-2">
-						<input
-							id="githubUsername"
-							type="text"
-							value={githubUsername}
-							onChange={(e) => {
-								setGithubUsername(e.target.value);
-								setGithubError(null);
-							}}
-							placeholder="your-github-username"
-							className="flex-1 rounded-md border bg-background px-3 py-2 font-mono text-sm"
-							disabled={githubSaving || githubSaved}
-						/>
-						<button
-							type="button"
-							onClick={saveGithubUsername}
-							disabled={githubSaving || githubSaved || !githubUsername.trim()}
-							className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-						>
-							{githubSaved ? "Saved" : githubSaving ? "Saving…" : "Save"}
-						</button>
-					</div>
-					{githubError && (
-						<p className="text-sm text-destructive">{githubError}</p>
-					)}
-					{!githubSaved && (
-						<p className="text-xs text-muted-foreground">
-							Save your GitHub username before paying so we can link this subscription to your account.
-						</p>
+					<span className="h-px w-6 bg-border" aria-hidden />
+					<span className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
+						<span className="flex h-6 w-6 items-center justify-center rounded-full bg-muted text-xs">
+							2
+						</span>
+						Pay
+					</span>
+					{state.receiveMode !== "any_chain" && (
+						<>
+							<span className="h-px w-6 bg-border" aria-hidden />
+							<span className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
+								<span className="flex h-6 w-6 items-center justify-center rounded-full bg-muted text-xs">
+									3
+								</span>
+								Verify
+							</span>
+						</>
 					)}
 				</div>
-			)}
-			{isSubscription && hasGithub && (
-				<p className="text-sm text-muted-foreground">
-					Subscribing as: <span className="font-mono font-medium">{state.githubUsername || githubUsername}</span>
-				</p>
-			)}
-			{state.status === "ready" && isWriteError && (
-				<div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-destructive">
-					<p className="font-medium">Payment failed</p>
-					<p className="mt-1 text-sm">
-						{writeError?.message ?? "Transaction was rejected or failed. Check your balance and try again."}
-					</p>
-				</div>
-			)}
-			<div className="rounded-lg border bg-card p-4 text-card-foreground">
-				<dl className="space-y-2">
-					<div>
-						<dt className="text-sm text-muted-foreground">
-							Amount
-						</dt>
-						<dd className="font-mono font-medium">
-							{price} {state.currency ?? "USDC"}
-						</dd>
-					</div>
-					<div>
-						<dt className="text-sm text-muted-foreground">
-							Pay to address
-						</dt>
-						<dd className="break-all font-mono text-sm">
-							{recipientAddress}
-						</dd>
-					</div>
-					<div>
-						<dt className="text-sm text-muted-foreground">
-							Network
-						</dt>
-						<dd className="text-sm">
-							{state.chainId === ARC_TESTNET_CHAIN_ID ? "Arc" : "Base Sepolia"}
-						</dd>
-					</div>
-				</dl>
-			</div>
 
-			{state.paymentOptions && state.paymentOptions.length > 1 && (
-				<div className="space-y-2">
-					<p className="text-sm font-medium">Pay with USDC on</p>
-					<div className="flex gap-2">
-						{state.paymentOptions.map((option) => (
-							<button
-								key={option.chainId}
-								type="button"
-								onClick={() => {
-									setState({
-										...state,
-										paymentUri: option.paymentUri,
-										chainId: option.chainId,
-										tokenAddress: option.tokenAddress,
-									});
-								}}
-								className={`rounded-md border px-4 py-2 text-sm font-medium transition-colors ${
-									state.chainId === option.chainId
-										? "border-primary bg-primary/10 text-primary"
-										: "border-input bg-background hover:bg-muted"
-								}`}
-							>
-								{option.chainName}
-							</button>
-						))}
-					</div>
-					<p className="text-xs text-muted-foreground">
-						Choose the chain where you have USDC. Your selected address receives funds on that chain.
-					</p>
-				</div>
-			)}
-
-			{state.receiveMode === "any_chain" && (
-				<div className="space-y-2 rounded-lg border border-dashed border-primary/40 bg-primary/5 p-4">
-					<p className="text-sm font-medium">Pay with Circle Gateway (cross-chain → Arc)</p>
-					<p className="text-xs text-muted-foreground">
-						Use your unified USDC balance in Circle Gateway. Funds arrive on Arc as the liquidity hub.
-						You must deposit USDC into the Gateway first (e.g.{" "}
-						<a
-							href="https://faucet.circle.com"
-							target="_blank"
-							rel="noopener noreferrer"
-							className="underline hover:no-underline"
-						>
-							Circle Faucet
-						</a>
-						{" "}+ Gateway deposit on Base Sepolia or Arc).
-					</p>
-					<div className="flex flex-wrap items-center gap-2">
-						<span className="text-xs text-muted-foreground">Source chain (Gateway balance):</span>
-						<button
-							type="button"
-							onClick={() => setGatewaySourceChainId(BASE_SEPOLIA_CHAIN_ID)}
-							className={`rounded-md border px-3 py-1.5 text-xs font-medium ${
-								gatewaySourceChainId === BASE_SEPOLIA_CHAIN_ID
-									? "border-primary bg-primary/10 text-primary"
-									: "border-input bg-background hover:bg-muted"
-							}`}
-						>
-							Base Sepolia
-						</button>
-						<button
-							type="button"
-							onClick={() => setGatewaySourceChainId(ARC_TESTNET_CHAIN_ID)}
-							className={`rounded-md border px-3 py-1.5 text-xs font-medium ${
-								gatewaySourceChainId === ARC_TESTNET_CHAIN_ID
-									? "border-primary bg-primary/10 text-primary"
-									: "border-input bg-background hover:bg-muted"
-							}`}
-						>
-							Arc
-						</button>
-					</div>
-					{gatewayDepositDone && (
-						<p className="text-sm text-green-600 dark:text-green-400">
-							Deposit complete. Use the <strong>same chain</strong> above as source. Wait 2–5 min (or up to ~20 min) for finality, then check balance below.
-						</p>
-					)}
-					{isConnected && walletAddress && (
-						<div className="flex flex-wrap items-center gap-2">
-							<button
-								type="button"
-								onClick={async () => {
-									setGatewayBalanceLoading(true);
-									setGatewayBalance(null);
-									try {
-										const r = await fetch(
-											`/api/circle/gateway/balances?depositor=${encodeURIComponent(walletAddress)}`,
-										);
-										const d = await r.json();
-										if (r.ok && typeof d.total === "string") setGatewayBalance(d.total);
-										else setGatewayBalance(null);
-									} catch {
-										setGatewayBalance(null);
-									} finally {
-										setGatewayBalanceLoading(false);
+				<div className="space-y-4">
+					{/* GitHub (subscription) — Step 0 */}
+					{subscriptionNeedsGithub && (
+						<section className="rounded-2xl border border-amber-500/30 bg-amber-500/5 p-4 shadow-sm">
+							<div className="flex items-center gap-2">
+								<span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-300">
+									*
+								</span>
+								<label
+									htmlFor="githubUsername"
+									className="text-sm font-medium"
+								>
+									GitHub username (required for subscription)
+								</label>
+							</div>
+							<div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
+								<input
+									id="githubUsername"
+									type="text"
+									value={githubUsername}
+									onChange={(e) => {
+										setGithubUsername(e.target.value);
+										setGithubError(null);
+									}}
+									placeholder="your-github-username"
+									className="min-w-0 flex-1 rounded-xl border border-input bg-background px-3.5 py-2.5 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+									disabled={githubSaving || githubSaved}
+								/>
+								<Button
+									type="button"
+									onClick={saveGithubUsername}
+									disabled={
+										githubSaving ||
+										githubSaved ||
+										!githubUsername.trim()
 									}
-								}}
-								disabled={gatewayBalanceLoading}
-								className="rounded-md border px-2 py-1 text-xs font-medium hover:bg-muted disabled:opacity-50"
-							>
-								{gatewayBalanceLoading ? "Checking…" : "Check Gateway balance"}
-							</button>
-							{gatewayBalance !== null && (
-								<span className="text-xs text-muted-foreground">
-									Gateway balance: <strong>{gatewayBalance} USDC</strong>
-									{parseFloat(gatewayBalance) < 0.11 && " — need ≥0.11 to pay (wait for finality)."}
+									className="shrink-0 rounded-xl"
+								>
+									{githubSaved
+										? "Saved"
+										: githubSaving
+											? "Saving…"
+											: "Save"}
+								</Button>
+							</div>
+							{githubError && (
+								<p className="mt-2 text-sm text-destructive">
+									{githubError}
+								</p>
+							)}
+							{!githubSaved && (
+								<p className="mt-1.5 text-xs text-muted-foreground">
+									Save your GitHub username before paying so
+									we can link this subscription to your
+									account.
+								</p>
+							)}
+						</section>
+					)}
+					{isSubscription && hasGithub && (
+						<p className="text-sm text-muted-foreground">
+							Subscribing as:{" "}
+							<span className="font-mono font-medium text-foreground">
+								{state.githubUsername || githubUsername}
+							</span>
+						</p>
+					)}
+
+					{/* Payment failed (ready + write error) */}
+					{state.status === "ready" && isWriteError && (
+						<div
+							className="flex items-start gap-3 rounded-2xl border border-destructive/30 bg-destructive/5 px-5 py-4"
+							role="alert"
+						>
+							<AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
+							<div>
+								<p className="font-medium text-destructive">
+									Payment failed
+								</p>
+								<p className="mt-1 text-sm text-destructive/90">
+									{writeError?.message ??
+										"Transaction was rejected or failed. Check your balance and try again."}
+								</p>
+							</div>
+						</div>
+					)}
+
+					{/* Step 1: Payment summary card */}
+					<section
+						className="rounded-2xl border border-border bg-card p-4 shadow-sm"
+						aria-label="Payment details"
+					>
+						<div className="flex flex-wrap items-start justify-between gap-4">
+							<div>
+								<p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+									Amount
+								</p>
+								<p className="mt-1 text-2xl font-semibold tabular-nums text-foreground">
+									{amountCopyText}
+								</p>
+								<CopyButton
+									value={amountCopyText}
+									buttonText="Copy amount"
+									variant="ghost"
+									size="xs"
+									className="mt-1.5 -ml-1 rounded-lg"
+								/>
+							</div>
+							{state.receiveMode !== "any_chain" && (
+								<span className="rounded-full bg-muted px-3 py-1.5 text-xs font-medium text-muted-foreground">
+									{networkLabel}
 								</span>
 							)}
 						</div>
-					)}
-					<div className="flex flex-wrap items-center gap-2">
-						<button
-							type="button"
-							onClick={handleDepositToGateway}
-							disabled={
-								!isConnected ||
-								isWritePending ||
-								!!gatewayDepositRef.current
-							}
-							className="rounded-md border border-amber-500/50 bg-amber-500/10 px-3 py-1.5 text-xs font-medium text-amber-700 dark:text-amber-400 hover:bg-amber-500/20 disabled:opacity-50"
-						>
-							{gatewayDepositRef.current
-								? gatewayDepositRef.current.phase === "approve"
-									? "Confirm approve in wallet…"
-									: "Confirm deposit in wallet…"
-								: `Deposit ${GATEWAY_DEPOSIT_AMOUNT_USDC} USDC to Gateway`}
-						</button>
-						<span className="text-xs text-muted-foreground">
-							Uses wallet USDC on selected chain → Gateway balance
-						</span>
-					</div>
-					{gatewayError && (
-						<p className="text-sm text-destructive">{gatewayError}</p>
-					)}
-					<button
-						type="button"
-						onClick={handlePayWithGateway}
-						disabled={
-							!isConnected ||
-							subscriptionNeedsGithub ||
-							gatewayStep === "loading" ||
-							gatewayStep === "sign" ||
-							gatewayStep === "request" ||
-							isWritePending
-						}
-						className="rounded-md border border-primary bg-primary/10 px-4 py-2 text-sm font-medium text-primary hover:bg-primary/20 disabled:opacity-50"
-					>
-						{!isConnected
-							? "Connect wallet"
-							: gatewayStep === "loading"
-								? "Loading…"
-								: gatewayStep === "sign"
-									? "Sign in wallet…"
-									: gatewayStep === "request"
-										? "Requesting attestation…"
-										: gatewayStep === "mint" || isWritePending
-											? "Confirm mint in wallet…"
-											: "Pay with Gateway"}
-					</button>
-				</div>
-			)}
-
-			{paymentUri ? (
-				<div className="space-y-3">
-					<p className="text-sm font-medium">
-						Scan or open in wallet
-					</p>
-					<p className="text-sm text-muted-foreground">
-						Scan the QR code with your wallet app, or tap the link
-						to open your wallet with the amount pre-filled.
-					</p>
-					<div className="flex flex-col items-center gap-4 sm:flex-row sm:items-start">
-						{qrDataUrl && (
-							<div className="shrink-0 rounded-lg border bg-white p-2">
-								{/* eslint-disable-next-line @next/next/no-img-element -- QR data URL not supported by next/image */}
-								<img
-									src={qrDataUrl}
-									alt="Payment QR code"
-									width={256}
-									height={256}
+						<div className="mt-4 border-t border-border pt-4">
+							<p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+								Recipient address
+							</p>
+							<div className="mt-1.5 flex flex-wrap items-center gap-2">
+								<code className="max-w-full break-all rounded-lg bg-muted/60 px-2 py-1.5 font-mono text-sm">
+									{recipientAddress}
+								</code>
+								<CopyButton
+									value={recipientAddress}
+									label="Copy recipient address"
+									buttonText="Copy"
+									variant="outline"
+									size="xs"
+									className="rounded-lg"
 								/>
 							</div>
-						)}
-						<div className="flex flex-col gap-2">
-							<button
-								type="button"
-								onClick={handlePayWithWallet}
-								disabled={isWritePending || subscriptionNeedsGithub}
-								className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-3 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-							>
-								{!isConnected
-									? "Connect wallet"
-									: isWritePending
-										? "Confirm in wallet…"
-										: "Pay with wallet"}
-							</button>
-							<p className="text-xs text-muted-foreground">
-								{!isConnected
-									? `Connect to pay with USDC on ${state.chainId === ARC_TESTNET_CHAIN_ID ? "Arc" : "Base Sepolia"}.`
-									: "Opens your wallet to send USDC (recipient and amount pre-filled)."}
+						</div>
+					</section>
+
+					{/* Step 2: Circle Gateway */}
+					{state.receiveMode === "any_chain" && (
+						<section
+							className="rounded-2xl border-2 border-primary/20 bg-primary/5 p-4 shadow-sm"
+							aria-label="Pay with Circle Gateway"
+						>
+							<div className="flex items-center gap-2">
+								<Wallet className="h-5 w-5 text-primary" />
+								<h2 className="text-base font-semibold text-foreground">
+									Pay with Circle Gateway
+								</h2>
+							</div>
+							<p className="mt-1.5 text-sm text-muted-foreground">
+								Payment is received on Arc. Use your unified
+								Gateway balance. Need funds? Use the{" "}
+								<a
+									href="https://faucet.circle.com"
+									target="_blank"
+									rel="noopener noreferrer"
+									className="font-medium text-primary underline underline-offset-2 hover:no-underline"
+								>
+									Circle Faucet
+								</a>{" "}
+								then deposit to Gateway on any supported chain.
+							</p>
+
+							{/* Step 2a: Source chain */}
+							<div className="mt-4">
+								<p className="mb-1.5 text-xs font-medium text-muted-foreground">
+									1. Select chain where you deposited into Gateway
+								</p>
+								<div className="flex flex-wrap gap-2">
+									{SUPPORTED_CHAINS.map((c) => (
+										<Button
+											key={c.chainId}
+											type="button"
+											variant={
+												gatewaySourceChainId === c.chainId
+													? "default"
+													: "outline"
+											}
+											size="sm"
+											onClick={() =>
+												setGatewaySourceChainId(c.chainId)
+											}
+											className="rounded-lg"
+										>
+											{c.name}
+										</Button>
+									))}
+								</div>
+							</div>
+
+							{/* Step 2b: Balance + deposit */}
+							<div className="mt-4">
+								<p className="mb-1.5 text-xs font-medium text-muted-foreground">
+									2. Check balance or deposit
+								</p>
+								{gatewayDepositDone && (
+									<p className="mb-2 text-sm text-primary">
+										Deposit complete. Wait 2–5 min for
+										finality, then check balance below.
+									</p>
+								)}
+								{isConnected && walletAddress && (
+									<div className="flex flex-wrap items-center gap-2">
+										<Button
+											type="button"
+											variant="outline"
+											size="sm"
+											onClick={async () => {
+												setGatewayBalanceLoading(true);
+												setGatewayBalance(null);
+												try {
+													const r = await fetch(
+														`/api/circle/gateway/balances?depositor=${encodeURIComponent(walletAddress)}`,
+													);
+													const d = await r.json();
+													if (
+														r.ok &&
+														typeof d.total === "string"
+													)
+														setGatewayBalance(d.total);
+													else setGatewayBalance(null);
+												} catch {
+													setGatewayBalance(null);
+												} finally {
+													setGatewayBalanceLoading(false);
+												}
+											}}
+											disabled={gatewayBalanceLoading}
+											className="rounded-lg"
+										>
+											{gatewayBalanceLoading
+												? "Checking…"
+												: "Check Gateway balance"}
+										</Button>
+										{gatewayBalance !== null && (
+											<span className="text-sm text-muted-foreground">
+												Balance:{" "}
+												<strong className="text-foreground">
+													{gatewayBalance} USDC
+												</strong>
+												{parseFloat(gatewayBalance) <
+													0.11 && (
+													<span className="text-amber-600 dark:text-amber-400">
+														{" "}
+														— need ≥0.11 (wait for
+														finality)
+													</span>
+												)}
+											</span>
+										)}
+									</div>
+								)}
+								<div className="mt-2 flex flex-wrap items-center gap-2">
+									<Button
+										type="button"
+										variant="outline"
+										size="sm"
+										onClick={handleDepositToGateway}
+										disabled={
+											!isConnected ||
+											isWritePending ||
+											!!gatewayDepositRef.current
+										}
+										className="rounded-lg border-amber-500/40 bg-amber-500/15 text-amber-800 hover:bg-amber-500/25 dark:text-amber-200 dark:hover:bg-amber-500/20"
+									>
+										{gatewayDepositRef.current
+											? gatewayDepositRef.current
+													.phase === "approve"
+												? "Confirm approve in wallet…"
+												: "Confirm deposit in wallet…"
+											: `Deposit ${GATEWAY_DEPOSIT_AMOUNT_USDC} USDC to Gateway`}
+									</Button>
+									<span className="text-xs text-muted-foreground">
+										Wallet → Gateway
+									</span>
+								</div>
+							</div>
+
+							{gatewayError && (
+								<p className="mt-2 text-sm text-destructive" role="alert">
+									{gatewayError}
+								</p>
+							)}
+
+							{/* Step 2c: Pay CTA */}
+							<div className="mt-4">
+								<p className="mb-1.5 text-xs font-medium text-muted-foreground">
+									3. Pay
+								</p>
+								<Button
+									type="button"
+									onClick={handlePayWithGateway}
+									disabled={
+										!isConnected ||
+										subscriptionNeedsGithub ||
+										gatewayStep === "loading" ||
+										gatewayStep === "sign" ||
+										gatewayStep === "request" ||
+										isWritePending
+									}
+									className="w-full rounded-xl py-3 font-medium"
+								>
+									{!isConnected
+										? "Connect wallet"
+										: gatewayStep === "loading"
+											? "Loading…"
+											: gatewayStep === "sign"
+												? "Sign in wallet…"
+												: gatewayStep === "request"
+													? "Requesting attestation…"
+													: gatewayStep === "mint" ||
+															isWritePending
+														? "Confirm mint in wallet…"
+														: "Pay with Gateway"}
+								</Button>
+							</div>
+						</section>
+					)}
+
+					{/* Step 2 (direct): Pay with wallet + Verify in one card */}
+					{state.receiveMode !== "any_chain" && (
+						<section
+							className="rounded-2xl border border-border bg-card p-4 shadow-sm"
+							aria-label="Pay and verify"
+						>
+							{paymentUri ? (
+								<>
+									<div className="flex items-center gap-2">
+										<Wallet className="h-5 w-5 text-primary" />
+										<h2 className="text-base font-semibold text-foreground">
+											Pay with your wallet
+										</h2>
+									</div>
+									<p className="mt-1.5 text-sm text-muted-foreground">
+										Scan the QR code or open your wallet
+										with amount and recipient pre-filled.
+									</p>
+									<div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-start">
+										{qrDataUrl && (
+											<div className="shrink-0 overflow-hidden rounded-xl border border-border bg-white p-2.5 shadow-sm">
+												{/* eslint-disable-next-line @next/next/no-img-element -- QR data URL */}
+												<img
+													src={qrDataUrl}
+													alt="Payment QR code"
+													width={200}
+													height={200}
+												/>
+											</div>
+										)}
+										<div className="flex flex-1 flex-col gap-2">
+											<Button
+												type="button"
+												onClick={handlePayWithWallet}
+												disabled={
+													isWritePending ||
+													subscriptionNeedsGithub
+												}
+												className="w-full rounded-xl py-3 font-medium sm:w-auto"
+											>
+												{!isConnected
+													? "Connect wallet"
+													: isWritePending
+														? "Confirm in wallet…"
+														: "Pay with wallet"}
+											</Button>
+											<p className="text-xs text-muted-foreground">
+												{!isConnected
+													? `Connect to pay with USDC on ${networkLabel}.`
+													: "Opens your wallet with recipient and amount pre-filled."}
+											</p>
+										</div>
+									</div>
+								</>
+							) : (
+								<p className="text-sm text-muted-foreground">
+									Send the amount above to the address, then
+									paste the transaction hash below to verify.
+								</p>
+							)}
+
+							{/* Verify: same card, clear separation */}
+							<div className="mt-4 border-t border-border pt-4">
+								<div className="flex items-center gap-2">
+									<Hash className="h-5 w-5 text-muted-foreground" />
+									<h3 className="text-sm font-semibold text-foreground">
+										Already sent? Verify with transaction hash
+									</h3>
+								</div>
+								<form
+									className="mt-2"
+									onSubmit={(e) => {
+										if (subscriptionNeedsGithub) {
+											e.preventDefault();
+											return;
+										}
+										handleVerify(e);
+									}}
+								>
+									<label
+										htmlFor="transactionHash"
+										className="sr-only"
+									>
+										Transaction hash
+									</label>
+									<input
+										id="transactionHash"
+										name="transactionHash"
+										type="text"
+										required
+										placeholder="Paste 0x… transaction hash"
+										className="w-full rounded-xl border border-input bg-background px-3.5 py-2.5 font-mono text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+										disabled={state.status === "verifying"}
+									/>
+									<Button
+										type="submit"
+										disabled={
+											state.status === "confirming" ||
+											state.status === "verifying" ||
+											subscriptionNeedsGithub
+										}
+										className="mt-2 w-full rounded-xl py-2.5 font-medium sm:w-auto sm:min-w-[140px]"
+									>
+										{state.status === "confirming"
+											? "Confirming…"
+											: state.status === "verifying"
+												? "Verifying…"
+												: "Verify payment"}
+									</Button>
+									{subscriptionNeedsGithub && (
+										<p className="mt-1.5 text-xs text-muted-foreground">
+											Save your GitHub username above
+											before verifying.
+										</p>
+									)}
+								</form>
+							</div>
+						</section>
+					)}
+
+					{/* Status: confirming / verifying */}
+					{(state.status === "confirming" ||
+						state.status === "verifying") && (
+						<div
+							className="flex items-center gap-3 rounded-2xl border border-primary/30 bg-primary/5 px-4 py-3"
+							role="status"
+							aria-live="polite"
+						>
+							<div className="h-5 w-5 shrink-0 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+							<p className="text-sm font-medium text-foreground">
+								{state.status === "confirming"
+									? "Waiting for transaction to be confirmed…"
+									: "Verifying payment on chain…"}
 							</p>
 						</div>
-					</div>
+					)}
 				</div>
-			) : (
-				<p className="text-sm text-muted-foreground">
-					Send the amount above to the address, then paste the
-					transaction hash below to verify.
-				</p>
-			)}
-
-			{(state.status === "confirming" || state.status === "verifying") && (
-				<p className="text-sm text-muted-foreground">
-					{state.status === "confirming"
-						? "Waiting for transaction to be confirmed on chain…"
-						: "Checking that payment reached our address on chain…"}
-				</p>
-			)}
-			<form
-				className="space-y-4 rounded-lg border p-4"
-				onSubmit={(e) => {
-					if (subscriptionNeedsGithub) {
-						e.preventDefault();
-						return;
-					}
-					handleVerify(e);
-				}}
-			>
-				<div>
-					<label
-						htmlFor="transactionHash"
-						className="mb-1 block text-sm font-medium"
-					>
-						Transaction hash
-					</label>
-					<input
-						id="transactionHash"
-						name="transactionHash"
-						type="text"
-						required
-						placeholder="0x…"
-						className="w-full rounded-md border bg-background px-3 py-2 font-mono text-sm"
-						disabled={state.status === "verifying"}
-					/>
-				</div>
-				<button
-					type="submit"
-					disabled={
-						state.status === "confirming" ||
-						state.status === "verifying" ||
-						subscriptionNeedsGithub
-					}
-					className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-				>
-					{state.status === "confirming"
-						? "Confirming…"
-						: state.status === "verifying"
-							? "Verifying…"
-							: "Verify payment"}
-				</button>
-				{subscriptionNeedsGithub && (
-					<p className="text-xs text-muted-foreground">
-						Save your GitHub username above before verifying payment.
-					</p>
-				)}
-			</form>
+			</div>
 		</main>
 	);
 }
