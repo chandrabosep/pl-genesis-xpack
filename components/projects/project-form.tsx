@@ -10,13 +10,14 @@ import {
 	SelectValue,
 } from "@/components/ui/select";
 
-const pricingOptions: PricingModel[] = ["per_device", "subscription"];
+const pricingOptions: PricingModel[] = ["per_device", "subscription", "per_user"];
 type ReceiveMode = "base" | "any_chain" | "sui";
 
 function pricingOptionLabel(model: PricingModel): string {
 	const labels: Record<PricingModel, string> = {
 		per_device: "Per device",
 		subscription: "Subscription",
+		per_user: "Per user",
 	};
 	return labels[model] ?? model;
 }

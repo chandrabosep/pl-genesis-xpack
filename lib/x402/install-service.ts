@@ -65,7 +65,7 @@ async function validateProjectApiKey(projectId: string, apiKey: string) {
 	return { project: key.project, apiKey: key };
 }
 
-/** Check if user is already entitled: per_device by deviceId, subscription by githubUserId or githubUsername */
+/** Check if user is already entitled: per_device by deviceId; subscription/per_user by githubUserId or githubUsername (subscription checks expiresAt, per_user has no expiry). */
 async function hasEntitlement(
 	projectId: string,
 	pricingModel: PricingModel,
@@ -78,6 +78,18 @@ async function hasEntitlement(
 			where: {
 				projectId,
 				expiresAt: { gt: new Date() },
+				OR: [
+					...(githubUserId ? [{ githubUserId }] : []),
+					...(githubUsername ? [{ githubUsername }] : []),
+				],
+			},
+		});
+		return count > 0;
+	}
+	if (pricingModel === "per_user" && (githubUserId || githubUsername)) {
+		const count = await prisma.entitlement.count({
+			where: {
+				projectId,
 				OR: [
 					...(githubUserId ? [{ githubUserId }] : []),
 					...(githubUsername ? [{ githubUsername }] : []),

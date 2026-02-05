@@ -1,4 +1,12 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Xpack — Monetize NPM packages with crypto
+
+Connect your wallet, add payment config to your package, and get paid in crypto when users install. No backend, no payment processors—just Web3 monetization.
+
+**Features:** Per-device & subscription pricing · USDC (EVM) + SUI payments · Dashboard & logs · Multi-chain (Base, Ethereum Sepolia, Avalanche Fuji, Sonic, Arc, Sui, etc.)
+
+👉 **Full description, features & pricing:** [PRODUCT.md](./PRODUCT.md)
+
+---
 
 ## Getting Started
 

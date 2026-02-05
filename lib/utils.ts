@@ -11,6 +11,7 @@ export function pricingModelLabel(model: PricingModel): string {
   const labels: Record<PricingModel, string> = {
     per_device: "Per device",
     subscription: "Subscription",
+    per_user: "Per user",
   }
   return labels[model] ?? model
 }

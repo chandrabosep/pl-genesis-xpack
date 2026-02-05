@@ -4,6 +4,7 @@ import type { PricingModel } from "./constants";
 const pricingModelSchema = z.enum([
 	"per_device",
 	"subscription",
+	"per_user",
 ] as const satisfies readonly PricingModel[]);
 
 export const receiveModeSchema = z.enum(["base", "any_chain", "sui"]);

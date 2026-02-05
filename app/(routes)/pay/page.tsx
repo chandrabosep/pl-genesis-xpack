@@ -786,8 +786,10 @@ export default function PayPage() {
 		return null;
 	const { price, address: recipientAddress, projectName } = state;
 	const isSubscription = state.pricingModel === "subscription";
+	const isPerUser = state.pricingModel === "per_user";
+	const isGithubBasedPricing = isSubscription || isPerUser;
 	const hasGithub = !!state.githubUsername || githubSaved;
-	const subscriptionNeedsGithub = isSubscription && !hasGithub;
+	const subscriptionNeedsGithub = isGithubBasedPricing && !hasGithub;
 
 	const isSuiOnly = state.receiveMode === "sui";
 	const networkLabel = isSuiOnly
@@ -824,6 +826,13 @@ export default function PayPage() {
 						<p className="mt-2 text-sm text-muted-foreground">
 							Subscription is tied to your GitHub identity. After
 							payment you can install from any machine with the
+							same GitHub user.
+						</p>
+					)}
+					{isPerUser && (
+						<p className="mt-2 text-sm text-muted-foreground">
+							Per-user access is tied to your GitHub identity. One
+							payment per user; install from any machine with the
 							same GitHub user.
 						</p>
 					)}
@@ -865,7 +874,7 @@ export default function PayPage() {
 				</div>
 
 				<div className="space-y-4">
-					{/* GitHub (subscription) — Step 0 */}
+					{/* GitHub (subscription / per_user) — Step 0 */}
 					{subscriptionNeedsGithub && (
 						<section className="rounded-2xl border border-amber-500/30 bg-amber-500/5 p-4 shadow-sm">
 							<div className="flex items-center gap-2">
@@ -876,7 +885,8 @@ export default function PayPage() {
 									htmlFor="githubUsername"
 									className="text-sm font-medium"
 								>
-									GitHub username (required for subscription)
+									GitHub username (required for{" "}
+									{isPerUser ? "per-user" : "subscription"})
 								</label>
 							</div>
 							<div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -917,15 +927,15 @@ export default function PayPage() {
 							{!githubSaved && (
 								<p className="mt-1.5 text-xs text-muted-foreground">
 									Save your GitHub username before paying so
-									we can link this subscription to your
+									we can link this purchase to your GitHub
 									account.
 								</p>
 							)}
 						</section>
 					)}
-					{isSubscription && hasGithub && (
+					{isGithubBasedPricing && hasGithub && (
 						<p className="text-sm text-muted-foreground">
-							Subscribing as:{" "}
+							{isSubscription ? "Subscribing" : "Paying"} as:{" "}
 							<span className="font-mono font-medium text-foreground">
 								{state.githubUsername || githubUsername}
 							</span>

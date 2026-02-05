@@ -88,6 +88,20 @@ function buildEntitlementData(
 			),
 		};
 	}
+	if (pricingModel === "per_user") {
+		if (!githubUserId && !githubUsername) {
+			throw new Error(
+				"GitHub identity (userId or username) is required for per_user entitlements (from install attempt)",
+			);
+		}
+		return {
+			projectId,
+			deviceId: null,
+			githubUserId: githubUserId ?? null,
+			githubUsername: githubUsername ?? null,
+			expiresAt: null,
+		};
+	}
 	if (pricingModel === "per_device") {
 		if (!deviceId) {
 			throw new Error("Device is required for per_device entitlements");

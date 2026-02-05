@@ -33,7 +33,7 @@ export default function LandingPage() {
 			icon: DollarSign,
 			title: "Recurring Revenue",
 			description:
-				"Subscriptions + per-device licensing unlock steady income streams and predictable growth.",
+				"Subscriptions, per-user, and per-device licensing unlock steady income streams and predictable growth.",
 		},
 		{
 			id: 3,
@@ -59,7 +59,7 @@ export default function LandingPage() {
 			icon: Code,
 			title: "Publish Package",
 			description:
-				"Add payment config to package.json. Choose subscription or per-device licensing. Publish to NPM as usual.",
+				"Add payment config to package.json. Choose subscription, per-user, or per-device licensing. Publish to NPM as usual.",
 		},
 		{
 			id: 3,
@@ -82,9 +82,9 @@ export default function LandingPage() {
 		{
 			id: 2,
 			icon: Zap,
-			title: "Subscription Plans",
+			title: "Subscription & Per-User",
 			description:
-				"Create flexible subscription tiers with custom pricing and renewal options.",
+				"Subscription tiers or one-time per-user (GitHub) licensing. Flexible pricing and renewal options.",
 		},
 		{
 			id: 3,
