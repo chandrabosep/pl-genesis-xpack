@@ -85,13 +85,13 @@ export default function DashboardPage() {
 	}
 
 	return (
-		<main className="space-y-8 p-6">
+		<main className="space-y-8 p-6 bg-linear-to-b from-white to-purple-50/30 min-h-full">
 			<header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
 				<div>
-					<h1 className="text-2xl font-semibold tracking-tight">
+					<h1 className="text-2xl font-semibold tracking-tight text-gray-900">
 						Dashboard
 					</h1>
-					<p className="mt-1 text-sm text-muted-foreground">
+					<p className="mt-1 text-sm text-gray-600">
 						How is my monetization doing at a glance?
 					</p>
 				</div>
@@ -102,52 +102,52 @@ export default function DashboardPage() {
 			</header>
 
 			<section className="grid gap-4 sm:grid-cols-3">
-				<Card>
+				<Card className="border border-gray-200 bg-white shadow-sm">
 					<CardHeader className="flex flex-row items-center justify-between pb-2">
-						<CardTitle className="text-sm font-medium text-muted-foreground">
+						<CardTitle className="text-sm font-medium text-gray-600">
 							Active projects
 						</CardTitle>
-						<FolderKanban className="size-4 text-muted-foreground" />
+						<FolderKanban className="size-4 text-purple-600/80" />
 					</CardHeader>
 					<CardContent>
 						{statsLoading ? (
-							<div className="h-8 w-20 animate-pulse rounded bg-muted" />
+							<div className="h-8 w-20 animate-pulse rounded bg-purple-50" />
 						) : (
-							<span className="text-2xl font-semibold">
+							<span className="text-2xl font-semibold text-gray-900">
 								{stats?.activeProjects ?? 0}
 							</span>
 						)}
 					</CardContent>
 				</Card>
-				<Card>
+				<Card className="border border-gray-200 bg-white shadow-sm">
 					<CardHeader className="flex flex-row items-center justify-between pb-2">
-						<CardTitle className="text-sm font-medium text-muted-foreground">
+						<CardTitle className="text-sm font-medium text-gray-600">
 							Successful installs
 						</CardTitle>
-						<Download className="size-4 text-muted-foreground" />
+						<Download className="size-4 text-cyan-500/80" />
 					</CardHeader>
 					<CardContent>
 						{statsLoading ? (
-							<div className="h-8 w-20 animate-pulse rounded bg-muted" />
+							<div className="h-8 w-20 animate-pulse rounded bg-purple-50" />
 						) : (
-							<span className="text-2xl font-semibold">
+							<span className="text-2xl font-semibold text-gray-900">
 								{stats?.installs ?? 0}
 							</span>
 						)}
 					</CardContent>
 				</Card>
-				<Card>
+				<Card className="border border-gray-200 bg-white shadow-sm">
 					<CardHeader className="flex flex-row items-center justify-between pb-2">
-						<CardTitle className="text-sm font-medium text-muted-foreground">
+						<CardTitle className="text-sm font-medium text-gray-600">
 							Total revenue
 						</CardTitle>
-						<DollarSign className="size-4 text-muted-foreground" />
+						<DollarSign className="size-4 text-purple-600/80" />
 					</CardHeader>
 					<CardContent>
 						{statsLoading ? (
-							<div className="h-8 w-20 animate-pulse rounded bg-muted" />
+							<div className="h-8 w-20 animate-pulse rounded bg-purple-50" />
 						) : (
-							<span className="text-2xl font-semibold">
+							<span className="text-2xl font-semibold text-gray-900">
 								{(stats?.totalPayments ?? 0).toLocaleString()} USDC
 							</span>
 						)}
@@ -164,7 +164,7 @@ export default function DashboardPage() {
 				>
 					<SelectTrigger
 						id="filter-project"
-						className="h-8 w-[160px] border-muted-foreground/20"
+						className="h-8 w-[160px] border-gray-200 bg-white"
 					>
 						<SelectValue placeholder="All projects" />
 					</SelectTrigger>
@@ -177,7 +177,7 @@ export default function DashboardPage() {
 						))}
 					</SelectContent>
 				</Select>
-				<span className="text-muted-foreground/50">|</span>
+				<span className="text-gray-300">|</span>
 				<DateRangePicker
 					dateFrom={filterDateFrom}
 					dateTo={filterDateTo}
@@ -191,7 +191,7 @@ export default function DashboardPage() {
 					<button
 						type="button"
 						onClick={clearFilters}
-						className="text-xs text-muted-foreground transition-colors hover:text-foreground"
+						className="text-xs text-gray-500 transition-colors hover:text-purple-600"
 					>
 						Clear
 					</button>
@@ -208,36 +208,36 @@ export default function DashboardPage() {
 			) : null}
 
 			<section>
-				<h2 className="mb-3 text-sm font-medium text-muted-foreground">
+				<h2 className="mb-3 text-sm font-medium text-gray-700">
 					Packages
 				</h2>
 				{loading ? (
-					<div className="flex items-center justify-center rounded-lg border border-border p-4">
+					<div className="flex items-center justify-center rounded-xl border border-gray-200 bg-white p-4">
 						<div className="flex w-full flex-col gap-3">
 							{Array.from({ length: 3 }).map((_, i) => (
 								<div
 									key={i}
-									className="flex animate-pulse items-center gap-4 border-b px-4 py-3 last:border-b-0"
+									className="flex animate-pulse items-center gap-4 border-b border-gray-100 px-4 py-3 last:border-b-0"
 								>
-									<div className="h-8 w-8 rounded bg-muted" />
+									<div className="h-8 w-8 rounded bg-purple-50" />
 									<div className="flex-1">
-										<div className="mb-2 h-4 w-1/3 rounded bg-muted" />
-										<div className="h-3 w-1/4 rounded bg-muted" />
+										<div className="mb-2 h-4 w-1/3 rounded bg-purple-50" />
+										<div className="h-3 w-1/4 rounded bg-purple-50/70" />
 									</div>
-									<div className="h-6 w-16 rounded bg-muted" />
-									<div className="h-6 w-12 rounded bg-muted" />
-									<div className="ml-auto h-6 w-20 rounded bg-muted" />
+									<div className="h-6 w-16 rounded bg-purple-50" />
+									<div className="h-6 w-12 rounded bg-purple-50" />
+									<div className="ml-auto h-6 w-20 rounded bg-purple-50" />
 								</div>
 							))}
 						</div>
 					</div>
 				) : projects.length === 0 ? (
-					<div className="rounded-lg border border-dashed bg-muted/30 py-16 text-center">
-						<Package className="mx-auto size-10 text-muted-foreground/70" />
-						<p className="mt-3 text-sm font-medium text-muted-foreground">
+					<div className="rounded-xl border border-dashed border-purple-200 bg-linear-to-br from-purple-50/50 to-cyan-50/50 py-16 text-center">
+						<Package className="mx-auto size-10 text-purple-600/60" />
+						<p className="mt-3 text-sm font-medium text-gray-700">
 							No packages yet
 						</p>
-						<p className="mx-auto mt-1 max-w-xs text-xs text-muted-foreground">
+						<p className="mx-auto mt-1 max-w-xs text-xs text-gray-600">
 							Create your first package to get an API key and
 							start integrating.
 						</p>
@@ -248,24 +248,24 @@ export default function DashboardPage() {
 						/>
 					</div>
 				) : (
-					<Card>
+					<Card className="border border-gray-200 overflow-hidden p-0">
 						<div className="overflow-x-auto">
 							<table className="w-full text-sm">
 								<thead>
-									<tr className="border-b bg-muted/30">
-										<th className="px-4 py-3 text-left font-medium">
+									<tr className="border-b border-gray-200 bg-purple-50">
+										<th className="px-4 py-3 text-left font-medium text-gray-900">
 											Package name
 										</th>
-										<th className="px-4 py-3 text-left font-medium">
+										<th className="px-4 py-3 text-left font-medium text-gray-900">
 											Pricing model
 										</th>
-										<th className="px-4 py-3 text-left font-medium">
+										<th className="px-4 py-3 text-left font-medium text-gray-900">
 											Price
 										</th>
-										<th className="px-4 py-3 text-left font-medium">
+										<th className="px-4 py-3 text-left font-medium text-gray-900">
 											Status
 										</th>
-										<th className="px-4 py-3 text-right font-medium">
+										<th className="px-4 py-3 text-right font-medium text-gray-900">
 											Quick actions
 										</th>
 									</tr>

@@ -15,13 +15,14 @@ export function Sidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="flex h-screen w-56 shrink-0 flex-col border-r border-sidebar-border bg-sidebar">
-      <div className="flex h-14 items-center border-b border-sidebar-border px-4">
+    <aside className="flex h-screen w-56 shrink-0 flex-col border-r border-gray-200 bg-white">
+      <div className="flex h-14 items-center border-b border-gray-200 px-4">
         <Link
           href="/dashboard"
-          className="text-lg font-semibold tracking-tight text-sidebar-foreground"
+          className="text-lg font-semibold tracking-tight flex items-center gap-0"
         >
-          Xpack
+          <span className="text-purple-600">X</span>
+          <span className="text-gray-900">pack</span>
         </Link>
       </div>
       <nav className="flex-1 space-y-0.5 p-3">
@@ -34,8 +35,8 @@ export function Sidebar() {
               href={link.href}
               className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
                 active
-                  ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                  : "text-sidebar-foreground/80 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
+                  ? "bg-purple-50 text-purple-700 border border-purple-200/80"
+                  : "text-gray-600 hover:bg-purple-50/70 hover:text-gray-900"
               }`}
             >
               <Icon className="size-4 shrink-0" />
@@ -44,7 +45,7 @@ export function Sidebar() {
           );
         })}
       </nav>
-      <div className="border-t border-sidebar-border p-3">
+      <div className="border-t border-gray-200 p-3">
         <ConnectButton />
       </div>
     </aside>

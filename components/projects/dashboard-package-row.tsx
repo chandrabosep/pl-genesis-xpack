@@ -1,19 +1,11 @@
 "use client";
 
-import { useState } from "react";
 import type { ProjectSummary } from "@/types/projects";
 import { pricingModelLabel } from "@/lib/utils";
-import {
-	Dialog,
-	DialogContent,
-	DialogHeader,
-	DialogTitle,
-} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { CopyButton } from "@/components/ui/copy-button";
-import { DashboardPackageCard } from "./dashboard-package-card";
-import { Copy, ExternalLink } from "lucide-react";
+import { ExternalLink } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 export function DashboardPackageRow({
 	project,
@@ -24,20 +16,20 @@ export function DashboardPackageRow({
 	walletAddress: string;
 	onUpdated: () => void;
 }) {
-	const [viewOpen, setViewOpen] = useState(false);
+	const router = useRouter();
 
 	return (
 		<>
-			<tr className="border-b last:border-0 transition-colors hover:bg-muted/20">
-				<td className="px-4 py-3 font-medium">{project.name}</td>
-				<td className="px-4 py-3 text-muted-foreground">
+			<tr className="border-b border-gray-100 last:border-0 transition-colors hover:bg-purple-50/50">
+				<td className="px-4 py-3 font-medium text-gray-900">{project.name}</td>
+				<td className="px-4 py-3 text-gray-600">
 					{pricingModelLabel(project.pricingModel)}
 				</td>
-				<td className="px-4 py-3">{project.price ?? 0} USDC</td>
+				<td className="px-4 py-3 text-gray-900">{project.price ?? 0} USDC</td>
 				<td className="px-4 py-3">
-					<Badge variant="secondary" className="text-xs font-normal">
+					<span className="inline-flex items-center rounded-full border border-purple-200 bg-purple-50 px-2.5 py-0.5 text-xs font-medium text-purple-700">
 						Active
-					</Badge>
+					</span>
 				</td>
 				<td className="px-4 py-3 text-right">
 					<div className="flex items-center justify-end gap-2">
@@ -48,14 +40,14 @@ export function DashboardPackageRow({
 								buttonText="Copy API key"
 								variant="ghost"
 								size="sm"
-								className="h-8 text-muted-foreground hover:text-foreground"
+								className="h-8 text-gray-600 hover:text-purple-600"
 							/>
 						) : null}
 						<Button
 							variant="ghost"
 							size="sm"
-							onClick={() => setViewOpen(true)}
-							className="h-8 text-muted-foreground hover:text-foreground"
+							onClick={() => router.push(`/projects/${project.id}`)}
+							className="h-8 text-gray-600 hover:text-purple-600"
 						>
 							<ExternalLink className="size-3.5" />
 							View project
@@ -63,22 +55,6 @@ export function DashboardPackageRow({
 					</div>
 				</td>
 			</tr>
-			<Dialog open={viewOpen} onOpenChange={setViewOpen}>
-				<DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
-					<DialogHeader>
-						<DialogTitle>{project.name}</DialogTitle>
-					</DialogHeader>
-					<DashboardPackageCard
-						project={project}
-						walletAddress={walletAddress}
-						onUpdated={() => {
-							onUpdated();
-							setViewOpen(false);
-						}}
-						embedded
-					/>
-				</DialogContent>
-			</Dialog>
 		</>
 	);
 }

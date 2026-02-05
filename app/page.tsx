@@ -132,11 +132,11 @@ export default function LandingPage() {
 								X<span className="text-gray-900">pack</span>
 							</span>
 						</Link>
-						<div className="flex items-center gap-4">
+						<div className="flex items-center gap-8">
 							{isConnected ? (
 								<Link
 									href="/dashboard"
-									className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+									className=" text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
 								>
 									Dashboard
 								</Link>

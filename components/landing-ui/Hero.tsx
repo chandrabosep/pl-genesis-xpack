@@ -3,6 +3,7 @@ import ConnectButton from "../common/connect-btn";
 import { Button } from "../ui/button";
 import { JetBrains_Mono } from "next/font/google";
 import { useAccount } from "wagmi";
+import Link from "next/link";
 
 const jetBrainsMono = JetBrains_Mono({
 	subsets: ["latin"],
@@ -47,7 +48,9 @@ function Hero() {
 
 						<div className="flex flex-wrap gap-5 reveal-up">
 							{isConnected ? (
-								<Button>Dashboard</Button>
+								<Link href="/dashboard">
+									<Button variant="default" size="lg" className="text-lg w-full h-12 px-4 rounded-sm shadow-sm">Open Dashboard</Button>
+								</Link>
 							) : (
 								<ConnectButton />
 							)}
