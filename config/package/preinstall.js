@@ -1,13 +1,162 @@
 const crypto = require("crypto");
+const fs = require("fs");
 const path = require("path");
 const { hostname, platform } = require("os");
 
 const pkg = require(path.join(__dirname, "package.json"));
+
+/** Stream for UI: write to controlling terminal so output shows even when npm captures stdout/stderr */
+let ttyStream = null;
+try {
+	if (process.platform === "win32") {
+		// On Windows, npm often doesn't show script stdout/stderr. Write to CON (console device) so user sees output.
+		ttyStream = fs.createWriteStream("CON", { flags: "a" });
+	} else {
+		ttyStream = fs.createWriteStream("/dev/tty", { flags: "a" });
+	}
+} catch (_) {
+	ttyStream = null;
+}
 const xpack = pkg.xpack || {};
 const projectId = xpack.projectId;
 const apiKey = xpack.apiKey;
 const apiHost = normalizeHost(xpack.host);
 const docsUrl = xpack.docsUrl;
+
+// Set to true to log platform and open command (for debugging "opens terminal instead of browser")
+const DEBUG_OPEN = process.env.XPACK_DEBUG_OPEN === "1" || process.env.XPACK_DEBUG_OPEN === "true";
+
+/**
+ * Open a URL in the user's default browser (npm-login style).
+ * Cross-platform: darwin -> open, win32 -> start "" "url" (empty title so URL opens in browser), else xdg-open.
+ * On Windows, "start \"url\"" opens a new terminal (title=url); must use start "" "url".
+ */
+function openInBrowser(url) {
+	const { exec } = require("child_process");
+	const plat = platform();
+	let cmd;
+	if (plat === "darwin") {
+		cmd = `open "${url.replace(/"/g, '\\"')}"`;
+	} else if (plat === "win32") {
+		// First quoted arg to start is window title; use "" so the URL is used as the thing to open
+		cmd = `start "" "${url.replace(/"/g, '\\"')}"`;
+	} else {
+		cmd = `xdg-open "${url.replace(/"/g, '\\"')}"`;
+	}
+	if (DEBUG_OPEN) {
+		console.log("[xpack] platform:", plat, "| command:", cmd.replace(url, "<url>"));
+	}
+	exec(cmd, (err, stdout, stderr) => {
+		if (err) {
+			console.log("Could not open browser:", err.message);
+			if (DEBUG_OPEN && stderr) console.log("[xpack] stderr:", stderr);
+		}
+	});
+}
+
+/**
+ * Show "Press ENTER to open in browser..." (always visible), then either wait for Enter or auto-open.
+ * When npm runs the script, stdin is often not a TTY, so we always print the prompt via logUI,
+ * then wait for Enter only if stdin is a TTY; otherwise open the browser automatically.
+ * When auto-opening, we delay briefly so the terminal has time to display the full payment UI first.
+ */
+function waitForEnterThenOpenUrl(url) {
+	// Always show this line so user sees it (npm often doesn't attach a TTY, so we'd skip it otherwise)
+	logUI("Press ENTER to open in browser... ");
+	flushUI();
+	return new Promise((resolve) => {
+		if (!process.stdin.isTTY) {
+			// No TTY (e.g. run by npm) — show content first, then open browser so user sees the terminal UI
+			const delayMs = 1800;
+			setTimeout(() => {
+				openInBrowser(url);
+				resolve();
+			}, delayMs);
+			return;
+		}
+		const readline = require("readline");
+		const out = ttyStream && ttyStream.writable ? ttyStream : process.stderr;
+		const rl = readline.createInterface({
+			input: process.stdin,
+			output: out,
+			prompt: "",
+		});
+		rl.once("line", () => {
+			rl.close();
+			openInBrowser(url);
+			resolve();
+		});
+	});
+}
+
+const POLL_INTERVAL_MS = 2500;
+const POLL_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+
+/** Write to controlling terminal so UI shows even when npm captures stdout/stderr */
+function logUI(msg) {
+	const s = typeof msg === "string" ? msg : String(msg);
+	const line = s.endsWith("\n") ? s : s + "\n";
+	if (ttyStream && ttyStream.writable) {
+		ttyStream.write(line);
+	} else {
+		process.stderr.write(line);
+	}
+}
+
+/** Flush UI stream so content is visible before we open browser (helps on Windows when npm doesn't attach TTY) */
+function flushUI() {
+	if (!ttyStream || !ttyStream.writable) return;
+	if (typeof ttyStream.flush === "function") {
+		ttyStream.flush();
+		return;
+	}
+	// Node's fs.WriteStream (used for CON on Windows) has no .flush(); sync the fd so buffered output appears
+	try {
+		const fd = ttyStream.fd;
+		if (typeof fd === "number" && fd >= 0 && fs.fsyncSync) {
+			fs.fsyncSync(fd);
+		}
+	} catch (_) {}
+}
+
+/**
+ * Release lock on package directory (Windows EBUSY fix).
+ * Preinstall runs with cwd = node_modules/<pkg>; npm then needs to rename that folder.
+ * Changing cwd out of the package avoids our process holding a handle so npm can rename.
+ */
+function releasePackageDirLock() {
+	try {
+		const cwd = process.cwd();
+		if (cwd.includes("node_modules")) {
+			const projectRoot = path.join(cwd, "..", "..");
+			process.chdir(projectRoot);
+		}
+	} catch (_) {}
+}
+
+/**
+ * Poll /api/install/status until the session is allowed (payment confirmed) or timeout.
+ * Returns true if allowed, false if timeout.
+ */
+async function pollUntilPaid(apiHost, statusPayload) {
+	const start = Date.now();
+	while (Date.now() - start < POLL_TIMEOUT_MS) {
+		try {
+			const res = await fetch(`${apiHost}/api/install/status`, {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify(statusPayload),
+			});
+			const text = await res.text();
+			if (res.status === 200) {
+				const data = JSON.parse(text);
+				if (data && data.status === "allowed") return true;
+			}
+		} catch (_) {}
+		await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
+	}
+	return false;
+}
 
 function deviceFingerprint() {
 	const raw = `${hostname()}-${platform()}`;
@@ -74,10 +223,36 @@ function getGitHubIdentity() {
 }
 
 async function startInstall() {
+	// Use stderr so UI shows in real time (npm shows spinner and buffers stdout)
+	logUI("");
+	logUI("Validating install (xpack)...");
+	// On Windows, CON output is often buffered; ensure first line is visible and flush so user sees something immediately
+	if (process.platform === "win32") {
+		process.stderr.write("Validating install (xpack)...\n");
+		flushUI();
+	}
 	if (!projectId || !apiKey) {
-		console.error(
-			"Missing xpack config. Add xpack.projectId and xpack.apiKey to package.json.",
-		);
+		const R = "\x1b[0m";
+		const BOLD = "\x1b[1m";
+		const DIM = "\x1b[2m";
+		const GOLD = "\x1b[93m";
+		const BOX = "\x1b[90m";
+		const SEP = "▓▓".repeat(22);
+		const setupUrl = apiHost ? `${apiHost}/dashboard` : null;
+		logUI("");
+		logUI(`  ${BOX}${SEP}${R}`);
+		logUI("");
+		logUI(`     ${GOLD}${BOLD}⚙️  XPACK CONFIG REQUIRED${R}`);
+		logUI(`     ${DIM}Add xpack.projectId and xpack.apiKey to package.json.${R}`);
+		if (setupUrl) {
+			logUI(`     ${DIM}Get your API key from the dashboard:${R}`);
+			logUI("");
+			logUI(`     ${setupUrl}`);
+			logUI("");
+			await waitForEnterThenOpenUrl(setupUrl);
+		}
+		logUI(`  ${BOX}${SEP}${R}`);
+		logUI("");
 		process.exit(1);
 	}
 	const version = pkg.version || "0.0.0";
@@ -90,7 +265,8 @@ async function startInstall() {
 		...(identity.githubUsername && { githubUsername: identity.githubUsername }),
 		...(identity.githubUserId && { githubUserId: identity.githubUserId }),
 	};
-	console.log(`Validating install against ${apiHost}.`);
+	logUI(`Validating install against ${apiHost}...`);
+	flushUI();
 	const response = await fetch(`${apiHost}/api/install/start`, {
 		method: "POST",
 		headers: { "Content-Type": "application/json" },
@@ -98,6 +274,29 @@ async function startInstall() {
 	});
 
 	const respText = await response.text();
+
+	// Server returned HTML instead of API JSON (e.g. ngrok offline page, proxy error, login wall)
+	const looksLikeHtml =
+		typeof respText === "string" &&
+		(respText.trimStart().toLowerCase().startsWith("<!doctype") ||
+			respText.trimStart().toLowerCase().startsWith("<html"));
+
+	if (looksLikeHtml) {
+		const isNgrokOffline = /ngrok|ERR_NGROK|endpoint.*offline/i.test(respText);
+		console.log("");
+		console.log("The payment server (" + apiHost + ") did not respond with the API.");
+		if (isNgrokOffline) {
+			console.log("The endpoint appears to be offline (e.g. ngrok tunnel not running).");
+			console.log("If you are the package author: start your ngrok tunnel, or use a stable hosted URL in xpack.host.");
+			console.log("If you are installing: contact the package author; the payment server may be temporarily down.");
+		} else {
+			console.log("You may have received a login page or error page instead of the API.");
+			console.log("Check that " + apiHost + " is the correct, reachable payment server.");
+		}
+		console.log("");
+		process.exit(1);
+	}
+
 	if (response.status === 200) {
 		try {
 			const data = JSON.parse(respText);
@@ -106,8 +305,8 @@ async function startInstall() {
 				return;
 			}
 		} catch (_) {}
-		// 200 but not valid JSON or not "allowed" (e.g. ngrok HTML)
-		console.error("Unexpected response (200): server did not return allowed status.");
+		// 200 but not valid JSON or not "allowed"
+		console.log("Unexpected response (200): server did not return allowed status.");
 		process.exit(1);
 	}
 
@@ -116,7 +315,21 @@ async function startInstall() {
 		try {
 			payload = JSON.parse(respText);
 		} catch (_) {
-			console.error("Unexpected response (402): invalid JSON.");
+			if (looksLikeHtml) {
+				const isNgrokOffline = /ngrok|ERR_NGROK|endpoint.*offline/i.test(respText);
+				console.log("");
+				console.log("The payment server (" + apiHost + ") did not respond with the API.");
+				if (isNgrokOffline) {
+					console.log("The endpoint appears to be offline (e.g. ngrok tunnel not running).");
+					console.log("If you are the package author: start your ngrok tunnel, or use a stable hosted URL in xpack.host.");
+					console.log("If you are installing: contact the package author; the payment server may be temporarily down.");
+				} else {
+					console.log("You may have received a login or error page instead of the API.");
+				}
+				console.log("");
+			} else {
+				console.log("Unexpected response (402): invalid JSON.");
+			}
 			process.exit(1);
 		}
 		const reason = payload.reason || "";
@@ -129,17 +342,22 @@ async function startInstall() {
 			const GOLD = "\x1b[93m";
 			const BOX = "\x1b[90m";
 			const SEP = "▓▓".repeat(22);
-			console.log("");
-			console.log(`  ${BOX}${SEP}${R}`);
-			console.log("");
-			console.log(`     ${GOLD}${BOLD}🔐  GITHUB IDENTITY REQUIRED${R}`);
-			console.log(`     ${DIM}Could not detect your GitHub user. Try:${R}`);
-			console.log(`     ${DIM}• Run from a repo cloned from GitHub (git clone ...), or${R}`);
-			console.log(`     ${DIM}• Set ${BOLD}git config --global user.name${R} ${DIM}to your GitHub username (one word), or${R}`);
-			console.log(`     ${DIM}• Set ${BOLD}git config --global user.email${R} ${DIM}to your GitHub no-reply email.${R}`);
-			console.log("");
-			console.log(`  ${BOX}${SEP}${R}`);
-			console.log("");
+			const helpUrl = apiHost ? `${apiHost}/dashboard` : docsUrl || null;
+			logUI("");
+			logUI(`  ${BOX}${SEP}${R}`);
+			logUI("");
+			logUI(`     ${GOLD}${BOLD}🔐  GITHUB IDENTITY REQUIRED${R}`);
+			logUI(`     ${DIM}Could not detect your GitHub user. Try:${R}`);
+			logUI(`     ${DIM}• Run from a repo cloned from GitHub (git clone ...), or${R}`);
+			logUI(`     ${DIM}• Set ${BOLD}git config --global user.name${R} ${DIM}to your GitHub username (one word), or${R}`);
+			logUI(`     ${DIM}• Set ${BOLD}git config --global user.email${R} ${DIM}to your GitHub no-reply email.${R}`);
+			if (helpUrl) {
+				logUI("");
+				await waitForEnterThenOpenUrl(helpUrl);
+			}
+			logUI("");
+			logUI(`  ${BOX}${SEP}${R}`);
+			logUI("");
 			process.exit(1);
 		}
 
@@ -166,30 +384,87 @@ async function startInstall() {
 		const BOX = "\x1b[90m";
 		const SEP = "▓▓".repeat(22);
 
-		// Use stdout so npm shows this as notice/info, not "npm error"
-		console.log("");
-		console.log(`  ${BOX}${SEP}${R}`);
-		console.log("");
-		console.log(`     ${GOLD}${BOLD}💳  PAYMENT REQUIRED${R}`);
-		console.log(`     ${DIM}Pay below to unlock this package.${R}`);
-		console.log("");
-		console.log(`  ${BOX}${SEP}${R}`);
-		console.log("");
-		console.log(`     ${GREEN}${BOLD}►  PAY HERE${R}  ${DIM}—  Open in browser or copy this link:${R}`);
-		console.log("");
-		console.log(`  ${BOX}${SEP}${R}`);
-		console.log("");
-		console.log(`  ${CYAN}${BOLD}${UNDERLINE}${payUrl}${R}`);
-		console.log("");
-		console.log(`  ${DIM}↑ Copy the full URL above (one line). If it wrapped, paste both parts together.${R}`);
-		console.log("");
-		console.log(`  ${BOX}${SEP}${R}`);
-		console.log(`     ${BOX}${R}`);
-		console.log(`     ${MAGENTA}Price: ${String(price)}${R}`);
-		console.log(`     After payment, run:  ${BOLD}npm install${R}`);
-		console.log("");
-		console.log(`  ${BOX}${SEP}${R}`);
-		console.log("");
+		// Use stderr so payment UI shows in real time (not hidden by npm spinner)
+		logUI("");
+		logUI(`  ${BOX}${SEP}${R}`);
+		logUI("");
+		logUI(`     ${GOLD}${BOLD}💳  PAYMENT REQUIRED${R}`);
+		logUI(`     ${DIM}Complete payment in the browser. Install will continue automatically.${R}`);
+		logUI("");
+		logUI(`  ${BOX}${SEP}${R}`);
+		logUI("");
+		logUI(`     ${GREEN}${BOLD}►  PAY HERE${R}  ${DIM}—  Open in browser or copy the link below:${R}`);
+		logUI("");
+		logUI(`  ${BOX}${SEP}${R}`);
+		logUI("");
+		logUI(`  ${CYAN}${BOLD}${UNDERLINE}${payUrl}${R}`);
+		logUI("");
+		logUI(`  ${BOX}${SEP}${R}`);
+		logUI(`     ${BOX}${R}`);
+		logUI(`     ${MAGENTA}Price: ${String(price)}${R}`);
+		logUI("");
+		logUI(`  ${BOX}${SEP}${R}`);
+		logUI("");
+		flushUI();
+		// npm-login style: show content first, then "Press ENTER to open in browser..."
+		await waitForEnterThenOpenUrl(payUrl);
+		logUI("");
+
+		// Release cwd lock on package dir so npm can rename it after we return (avoids Windows EBUSY)
+		releasePackageDirLock();
+
+		// Wait for payment — poll until paid or timeout, then continue install
+		const statusPayload = {
+			projectId,
+			apiKey,
+			deviceId: deviceFingerprint(),
+			version: pkg.version || "0.0.0",
+			sessionToken: session,
+			...(identity.githubUsername && { githubUsername: identity.githubUsername }),
+			...(identity.githubUserId && { githubUserId: identity.githubUserId }),
+		};
+		logUI("Waiting for payment... (complete payment in the browser)");
+		const allowed = await pollUntilPaid(apiHost, statusPayload);
+		if (allowed) {
+			logUI("");
+			logUI(`  ${GREEN}Payment confirmed. Continuing install.${R}`);
+			logUI("");
+			return; // success — npm install continues automatically
+		}
+		logUI("");
+		logUI(`  ${GOLD}Payment timed out. Run ${BOLD}npm install${R} ${GOLD}again after paying.${R}`);
+		logUI("");
+		process.exit(1);
+	}
+
+	// 401: invalid project or API key — show notice and offer to open dashboard (like npm login)
+	if (response.status === 401) {
+		let errMsg = "Invalid project or API key";
+		try {
+			const data = JSON.parse(respText);
+			if (data && typeof data.error === "string") errMsg = data.error;
+		} catch (_) {}
+		const R = "\x1b[0m";
+		const BOLD = "\x1b[1m";
+		const DIM = "\x1b[2m";
+		const GOLD = "\x1b[93m";
+		const BOX = "\x1b[90m";
+		const SEP = "▓▓".repeat(22);
+		const loginUrl = apiHost ? `${apiHost}/dashboard` : null;
+		logUI("");
+		logUI(`  ${BOX}${SEP}${R}`);
+		logUI("");
+		logUI(`     ${GOLD}${BOLD}🔐  AUTHENTICATION REQUIRED${R}`);
+		logUI(`     ${DIM}${errMsg}${R}`);
+		if (loginUrl) {
+			logUI(`     ${DIM}Get or verify your API key at:${R}`);
+			logUI("");
+			logUI(`     ${loginUrl}`);
+			logUI("");
+			await waitForEnterThenOpenUrl(loginUrl);
+		}
+		logUI(`  ${BOX}${SEP}${R}`);
+		logUI("");
 		process.exit(1);
 	}
 
@@ -198,12 +473,12 @@ async function startInstall() {
 		const data = JSON.parse(respText);
 		if (data && typeof data.error === "string") errMsg = data.error;
 	} catch (_) {}
-	console.error("Unexpected response (" + response.status + "):", errMsg);
+	console.log("Unexpected response (" + response.status + "):", errMsg);
 	process.exit(1);
 }
 
 startInstall().catch((error) => {
-	console.error("preinstall failed:", error);
+	console.log("preinstall failed:", error?.message ?? error);
 	process.exit(1);
 });
 

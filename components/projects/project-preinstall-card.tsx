@@ -75,8 +75,10 @@ export function ProjectPreinstallCard({
 			<CardHeader>
 				<CardTitle>How to add code to the package</CardTitle>
 				<CardDescription>
-					Follow these steps to integrate payment validation into
-					your package.
+					The preinstall script validates installs with this project:
+					checks xpack config, optionally requires GitHub identity and
+					payment, then polls until payment is confirmed. Follow the
+					steps below to add it to your package.
 				</CardDescription>
 			</CardHeader>
 			<CardContent className="space-y-6">
@@ -201,7 +203,7 @@ export function ProjectPreinstallCard({
 							<span className="font-medium text-foreground">
 								xpack config
 							</span>{" "}
-							(projectId and apiKey — no .env needed):
+							(projectId, apiKey, host — no .env needed):
 							<div className="relative mt-1">
 								<pre className="overflow-x-auto rounded-lg border bg-muted/50 p-3 pr-12 font-mono text-xs">
 									{xpackConfig}
@@ -210,6 +212,32 @@ export function ProjectPreinstallCard({
 									<CopyButton
 										value={xpackConfig}
 										label="Copy xpack config"
+										buttonText="Copy"
+									/>
+								</div>
+							</div>
+						</li>
+						<li>
+							<span className="font-medium text-foreground">
+								Optional: docsUrl
+							</span>{" "}
+							— custom payment or docs URL (if omitted, the script
+							uses{" "}
+							<code className="rounded bg-muted px-1 py-0.5 font-mono">
+								host + /pay?session=...
+							</code>
+							):
+							<div className="relative mt-1">
+								<pre className="overflow-x-auto rounded-lg border bg-muted/50 p-3 pr-12 font-mono text-xs">
+									{`"xpack": {
+  ...
+  "docsUrl": "https://your-docs.com/pay"
+}`}
+								</pre>
+								<div className="absolute right-2 top-2">
+									<CopyButton
+										value={`"xpack": {\n  ...\n  \"docsUrl\": \"https://your-docs.com/pay\"\n}`}
+										label="Copy docsUrl snippet"
 										buttonText="Copy"
 									/>
 								</div>
@@ -251,17 +279,25 @@ export function ProjectPreinstallCard({
 					Add{" "}
 					<code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">
 						xpack.projectId
-					</code>{" "}
-					and{" "}
+					</code>
+					,{" "}
 					<code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">
 						xpack.apiKey
+					</code>
+					, and{" "}
+					<code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">
+						xpack.host
 					</code>{" "}
 					to your{" "}
 					<code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">
 						package.json
 					</code>{" "}
-					(use the Project ID and API key from this page). No .env
-					required.
+					(use the Project ID, API key, and app URL from this page).
+					Optional:{" "}
+					<code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">
+						xpack.docsUrl
+					</code>{" "}
+					for a custom payment/docs link. No .env required.
 				</p>
 			</CardContent>
 		</Card>
