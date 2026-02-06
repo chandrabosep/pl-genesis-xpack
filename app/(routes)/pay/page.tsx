@@ -707,7 +707,7 @@ export default function PayPage() {
 						Use the payment link from the install flow (CLI or
 						docs).
 					</p>
-					<div className="mt-6 rounded-xl border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+					<div className="mt-6 rounded-md border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive">
 						{state.error}
 					</div>
 				</div>
@@ -756,7 +756,7 @@ export default function PayPage() {
 					<h1 className="text-xl font-semibold tracking-tight">
 						Verification failed
 					</h1>
-					<div className="mt-4 rounded-xl border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+					<div className="mt-4 rounded-md border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive">
 						{state.error}
 					</div>
 					<p className="mt-4 text-sm text-muted-foreground">
@@ -767,7 +767,7 @@ export default function PayPage() {
 						<button
 							type="button"
 							onClick={() => fetchSession(sessionParam.trim())}
-							className="mt-6 rounded-xl border border-border bg-background px-4 py-2.5 text-sm font-medium hover:bg-muted"
+							className="mt-6 rounded-md border border-border bg-background px-4 py-2.5 text-sm font-medium hover:bg-muted"
 						>
 							Try again
 						</button>
@@ -840,7 +840,7 @@ export default function PayPage() {
 
 				{/* Step indicator: 1 Review → 2 Pay → 3 Verify (direct) or 1 Review → 2 Pay (Gateway) */}
 				<div
-					className="mb-4 flex items-center justify-center gap-2 rounded-xl bg-card px-4 py-2.5 shadow-sm ring-1 ring-border/50"
+					className="mb-4 flex items-center justify-center gap-2 rounded-md bg-card px-4 py-2.5 shadow-sm ring-1 ring-border/50"
 					aria-label="Payment steps"
 				>
 					<span className="flex items-center gap-1.5 text-sm font-medium text-foreground">
@@ -899,7 +899,7 @@ export default function PayPage() {
 										setGithubError(null);
 									}}
 									placeholder="your-github-username"
-									className="min-w-0 flex-1 rounded-xl border border-input bg-background px-3.5 py-2.5 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+									className="min-w-0 flex-1 rounded-md border border-input bg-background px-3.5 py-2.5 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-ring"
 									disabled={githubSaving || githubSaved}
 								/>
 								<Button
@@ -910,7 +910,7 @@ export default function PayPage() {
 										githubSaved ||
 										!githubUsername.trim()
 									}
-									className="shrink-0 rounded-xl"
+									className="shrink-0 rounded-md"
 								>
 									{githubSaved
 										? "Saved"
@@ -1163,7 +1163,7 @@ export default function PayPage() {
 												);
 											}
 										}}
-										className="w-full rounded-xl border-2 border-[#6fbcf0] bg-[#6fbcf0] py-3 font-semibold text-white hover:bg-[#5aabdf] hover:text-white"
+										className="w-full rounded-md border-2 border-[#6fbcf0] bg-[#6fbcf0] py-3 font-semibold text-white hover:bg-[#5aabdf] hover:text-white"
 									>
 										{suiWallet.connectionStatus === "disconnected"
 											? "Connect Sui Wallet"
@@ -1203,7 +1203,7 @@ export default function PayPage() {
 												setSuiVerifyError(null);
 											}}
 											placeholder="Paste transaction digest from Sui wallet/explorer"
-											className="min-w-0 flex-1 rounded-xl border border-input bg-background px-3.5 py-2.5 font-mono text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+											className="min-w-0 flex-1 rounded-md border border-input bg-background px-3.5 py-2.5 font-mono text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
 											disabled={suiVerifying}
 										/>
 										<Button
@@ -1213,7 +1213,7 @@ export default function PayPage() {
 												!suiVerifyDigest.trim() ||
 												subscriptionNeedsGithub
 											}
-											className="rounded-xl py-2.5 font-medium sm:w-auto sm:min-w-[140px]"
+											className="rounded-md py-2.5 font-medium sm:w-auto sm:min-w-[140px]"
 										>
 											{suiVerifying
 												? "Verifying…"
@@ -1409,7 +1409,7 @@ export default function PayPage() {
 										gatewayStep === "request" ||
 										isWritePending
 									}
-									className="w-full rounded-xl py-3 font-medium"
+									className="w-full rounded-md py-3 font-medium"
 								>
 									{!isConnected
 										? "Connect wallet"
@@ -1450,7 +1450,7 @@ export default function PayPage() {
 										</p>
 										<div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-start">
 											{qrDataUrl && (
-												<div className="shrink-0 overflow-hidden rounded-xl border border-border bg-white p-2.5 shadow-sm">
+												<div className="shrink-0 overflow-hidden rounded-md border border-border bg-white p-2.5 shadow-sm">
 													{/* eslint-disable-next-line @next/next/no-img-element -- QR data URL */}
 													<img
 														src={qrDataUrl}
@@ -1470,7 +1470,7 @@ export default function PayPage() {
 														isWritePending ||
 														subscriptionNeedsGithub
 													}
-													className="w-full rounded-xl py-3 font-medium sm:w-auto"
+													className="w-full py-3 font-medium sm:w-auto"
 												>
 													{!isConnected
 														? "Connect wallet"
@@ -1525,7 +1525,7 @@ export default function PayPage() {
 											type="text"
 											required
 											placeholder="Paste 0x… transaction hash"
-											className="w-full rounded-xl border border-input bg-background px-3.5 py-2.5 font-mono text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+											className="w-full rounded-md border border-input bg-background px-3.5 py-2.5 font-mono text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
 											disabled={
 												state.status === "verifying"
 											}
@@ -1537,7 +1537,7 @@ export default function PayPage() {
 												state.status === "verifying" ||
 												subscriptionNeedsGithub
 											}
-											className="mt-2 w-full rounded-xl py-2.5 font-medium sm:w-auto sm:min-w-[140px]"
+											className="mt-2 w-full py-2.5 font-medium sm:w-auto sm:min-w-[140px]"
 										>
 											{state.status === "confirming"
 												? "Confirming…"
