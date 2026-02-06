@@ -43,7 +43,7 @@ function Hero() {
 							>
 								Monetize your
 								<br />
-								<span className="font-serif italic text-gradient bg-linear-to-r from-purple-600 to-cyan-500 bg-clip-text text-transparent">
+								<span className="bg-purple-600 bg-clip-text text-transparent">
 									NPM packages
 								</span>
 								<br />

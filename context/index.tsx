@@ -43,8 +43,10 @@ createAppKit({
 	networks,
 	defaultNetwork: baseSepolia,
 	metadata: metadata,
-	features: {
-		analytics: true, // Optional - defaults to your Cloud configuration
+	themeMode: "light",
+	themeVariables: {
+		"--apkt-accent": "#9333ea",
+		"--apkt-z-index": 60,
 	},
 });
 

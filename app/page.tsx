@@ -158,7 +158,7 @@ export default function LandingPage() {
 						<div className="mb-12 space-y-4 text-center">
 							<h2 className="text-3xl md:text-5xl font-bold tracking-tight ">
 								Why Choose{" "}
-								<span className="font-serif italic text-gradient bg-gradient-to-r from-purple-600 to-cyan-500 bg-clip-text text-transparent">
+								<span className="bg-purple-600 bg-clip-text text-transparent">
 									Xpack?{" "}
 								</span>
 							</h2>
@@ -188,7 +188,7 @@ export default function LandingPage() {
 						<div className="text-center mb-20 space-y-4 reveal-up">
 							<h2 className="text-3xl md:text-5xl font-bold tracking-tight">
 								How it{" "}
-								<span className="font-serif italic text-gradient bg-gradient-to-r from-purple-600 to-cyan-500 bg-clip-text text-transparent">
+								<span className="bg-purple-600 bg-clip-text text-transparent">
 									Works
 								</span>
 							</h2>
@@ -219,7 +219,7 @@ export default function LandingPage() {
 						<div className="text-center mb-20 space-y-4 reveal-up">
 							<h2 className="text-3xl md:text-5xl font-bold tracking-tight">
 								Powerful{" "}
-								<span className="font-serif italic text-gradient bg-gradient-to-r from-purple-600 to-cyan-500 bg-clip-text text-transparent">
+								<span className="bg-purple-600 bg-clip-text text-transparent">
 									Features
 								</span>
 							</h2>
