@@ -44,6 +44,45 @@ function buildExamplePackageJson(
 }`;
 }
 
+function CodeBlock({
+	label,
+	value,
+	copyLabel = "Copy",
+}: {
+	label: string;
+	value: string;
+	copyLabel?: string;
+}) {
+	return (
+		<div className="rounded-lg border border-border bg-muted/40 overflow-hidden">
+			<div className="flex items-center justify-between gap-2 border-b border-border bg-muted/60 px-3 py-1.5">
+				<span className="text-xs font-medium text-muted-foreground font-mono">
+					{label}
+				</span>
+				<CopyButton
+					value={value}
+					label={copyLabel}
+					buttonText="Copy"
+					size="xs"
+					variant="ghost"
+					className="h-7 text-muted-foreground"
+				/>
+			</div>
+			<pre className="max-h-80 overflow-auto p-4 text-xs font-mono text-foreground leading-relaxed whitespace-pre">
+				<code>{value}</code>
+			</pre>
+		</div>
+	);
+}
+
+function Note({ children }: { children: React.ReactNode }) {
+	return (
+		<div className="rounded-lg border border-primary/20 bg-primary/5 px-3 py-2.5 text-sm text-foreground">
+			<span className="font-semibold text-primary">Note:</span> {children}
+		</div>
+	);
+}
+
 export function ProjectPreinstallCard({
 	preinstallScript,
 	projectId,
@@ -51,13 +90,11 @@ export function ProjectPreinstallCard({
 	host,
 }: {
 	preinstallScript: string;
-	/** When provided, xpack config blocks show these values instead of placeholders. */
 	projectId?: string;
 	apiKey?: string;
 	host?: string;
 }) {
-	const effectiveProjectId =
-		projectId?.trim() ?? PLACEHOLDER_PROJECT_ID;
+	const effectiveProjectId = projectId?.trim() ?? PLACEHOLDER_PROJECT_ID;
 	const effectiveApiKey = apiKey?.trim() ?? PLACEHOLDER_API_KEY;
 	const effectiveHost = host?.trim() ?? PLACEHOLDER_HOST;
 	const xpackConfig = buildXpackConfig(
@@ -70,234 +107,135 @@ export function ProjectPreinstallCard({
 		effectiveApiKey,
 		effectiveHost,
 	);
+
 	return (
-		<Card>
-			<CardHeader>
-				<CardTitle>How to add code to the package</CardTitle>
-				<CardDescription>
-					The preinstall script validates installs with this project:
-					checks xpack config, optionally requires GitHub identity and
-					payment, then polls until payment is confirmed. Follow the
-					steps below to add it to your package.
+		<Card className="rounded-xl border border-border/80 bg-card shadow-sm scroll-mt-6" id="integration-guide">
+			<CardHeader className="space-y-1">
+				<CardTitle className="text-lg font-semibold tracking-tight text-foreground">
+					Integration guide
+				</CardTitle>
+				<CardDescription className="text-sm leading-relaxed">
+					Add the preinstall script to your package so installs are validated with this project:
+					the script checks xpack config, can require GitHub identity and payment, then polls until payment is confirmed.
 				</CardDescription>
 			</CardHeader>
-			<CardContent className="space-y-6">
-				<div className="space-y-2">
-					<p className="font-medium">Step 1</p>
-					<p className="text-sm text-muted-foreground">
-						Open your package in VSCode (or any editor).
+			<CardContent className="space-y-8 pt-2">
+				{/* Step 1 */}
+				<section className="space-y-2">
+					<h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+						<span className="flex size-6 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-bold">
+							1
+						</span>
+						Open your package
+					</h3>
+					<p className="text-sm text-muted-foreground pl-8">
+						Open your package root in VS Code or any editor (same folder as <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">package.json</code>).
 					</p>
-				</div>
+				</section>
 
-				<div className="space-y-2">
-					<p className="font-medium">Step 2</p>
-					<p className="text-sm text-muted-foreground">
-						Create a file named{" "}
-						<code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">
-							preinstall.js
-						</code>{" "}
-						in your package root and paste the following code:
+				{/* Step 2 */}
+				<section className="space-y-2">
+					<h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+						<span className="flex size-6 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-bold">
+							2
+						</span>
+						Add the preinstall script
+					</h3>
+					<p className="text-sm text-muted-foreground pl-8">
+						Create a file named <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">preinstall.js</code> in your package root and paste the code below.
 					</p>
-					<div className="relative">
-						<pre className="max-h-80 overflow-auto rounded-lg border bg-muted/50 p-4 text-xs font-mono">
-							<code className="whitespace-pre">
-								{preinstallScript}
-							</code>
-						</pre>
-						<div className="absolute right-2 top-2">
-							<CopyButton
-								value={preinstallScript}
-								label="Copy preinstall script"
-								buttonText="Copy script"
+					<div className="pl-8">
+						<CodeBlock
+							label="preinstall.js"
+							value={preinstallScript}
+							copyLabel="Copy preinstall script"
+						/>
+					</div>
+				</section>
+
+				{/* Step 3 */}
+				<section className="space-y-3">
+					<h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+						<span className="flex size-6 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-bold">
+							3
+						</span>
+						Update package.json
+					</h3>
+					<p className="text-sm text-muted-foreground pl-8">
+						Add the following to your <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">package.json</code>. Use the Project ID, API key, and app URL from the Credentials section above.
+					</p>
+
+					<Note>
+						Use the <code className="rounded bg-muted px-1 py-0.5 font-mono">preinstall</code> script (not <code className="rounded bg-muted px-1 py-0.5 font-mono">install</code>). The script runs before dependencies are installed.
+					</Note>
+
+					<div className="space-y-4 pl-8">
+						<div>
+							<p className="text-xs font-medium text-muted-foreground mb-1.5">scripts</p>
+							<CodeBlock
+								label="package.json"
+								value={`"scripts": {
+  ...
+  "preinstall": "node ./preinstall.js"
+},`}
+								copyLabel="Copy scripts snippet"
 							/>
 						</div>
-					</div>
-				</div>
-
-				<div className="space-y-3">
-					<p className="font-medium">Step 3</p>
-					<p className="text-sm text-muted-foreground">
-						Add or update the following in your{" "}
-						<code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">
-							package.json
-						</code>
-						:
-					</p>
-					<ol className="list-inside list-decimal space-y-3 text-sm text-muted-foreground">
-						<li>
-							<span className="font-medium text-foreground">
-								Preinstall script
-							</span>{" "}
-							(use{" "}
-							<code className="rounded bg-muted px-1 py-0.5 font-mono">
-								preinstall
-							</code>
-							, not{" "}
-							<code className="rounded bg-muted px-1 py-0.5 font-mono">
-								install
-							</code>
-							) — add inside{" "}
-							<code className="rounded bg-muted px-1 py-0.5 font-mono">
-								scripts
-							</code>
-							:
-							<div className="relative mt-1">
-								<pre className="overflow-x-auto rounded-lg border bg-muted/50 p-3 pr-12 font-mono text-xs">
-									{`"scripts": {
-    ...
-    "preinstall": "node ./preinstall.js"
-  },`}
-								</pre>
-								<div className="absolute right-2 top-2">
-									<CopyButton
-										value={`"scripts": {\n    ...\n    "preinstall": "node ./preinstall.js"\n  },`}
-										label="Copy scripts snippet"
-										buttonText="Copy"
-									/>
-								</div>
-							</div>
-						</li>
-						<li>
-							<span className="font-medium text-foreground">
-								Publish only the script
-							</span>
-							:
-							<div className="relative mt-1">
-								<pre className="overflow-x-auto rounded-lg border bg-muted/50 p-3 pr-12 font-mono text-xs">
-									{`"files": ["preinstall.js"]`}
-								</pre>
-								<div className="absolute right-2 top-2">
-									<CopyButton
-										value={'"files": ["preinstall.js"]'}
-										label="Copy files snippet"
-										buttonText="Copy"
-									/>
-								</div>
-							</div>
-						</li>
-						<li>
-							<span className="font-medium text-foreground">
-								Minimum Node version
-							</span>{" "}
-							(needed for{" "}
-							<code className="rounded bg-muted px-1 py-0.5 font-mono">
-								fetch
-							</code>
-							):
-							<div className="relative mt-1">
-								<pre className="overflow-x-auto rounded-lg border bg-muted/50 p-3 pr-12 font-mono text-xs">
-									{`"engines": {
-  "node": ">=18.0.0"
-}`}
-								</pre>
-								<div className="absolute right-2 top-2">
-									<CopyButton
-										value={`"engines": {\n  "node": ">=18.0.0"\n}`}
-										label="Copy engines snippet"
-										buttonText="Copy"
-									/>
-								</div>
-							</div>
-						</li>
-						<li>
-							<span className="font-medium text-foreground">
-								xpack config
-							</span>{" "}
-							(projectId, apiKey, host — no .env needed):
-							<div className="relative mt-1">
-								<pre className="overflow-x-auto rounded-lg border bg-muted/50 p-3 pr-12 font-mono text-xs">
-									{xpackConfig}
-								</pre>
-								<div className="absolute right-2 top-2">
-									<CopyButton
-										value={xpackConfig}
-										label="Copy xpack config"
-										buttonText="Copy"
-									/>
-								</div>
-							</div>
-						</li>
-						<li>
-							<span className="font-medium text-foreground">
-								Optional: docsUrl
-							</span>{" "}
-							— custom payment or docs URL (if omitted, the script
-							uses{" "}
-							<code className="rounded bg-muted px-1 py-0.5 font-mono">
-								host + /pay?session=...
-							</code>
-							):
-							<div className="relative mt-1">
-								<pre className="overflow-x-auto rounded-lg border bg-muted/50 p-3 pr-12 font-mono text-xs">
-									{`"xpack": {
+						<div>
+							<p className="text-xs font-medium text-muted-foreground mb-1.5">files (publish only the script)</p>
+							<CodeBlock
+								label="package.json"
+								value={'"files": ["preinstall.js"]'}
+								copyLabel="Copy files snippet"
+							/>
+						</div>
+						<div>
+							<p className="text-xs font-medium text-muted-foreground mb-1.5">engines (Node &gt;= 18 for fetch)</p>
+							<CodeBlock
+								label="package.json"
+								value={'"engines": {\n  "node": ">=18.0.0"\n}'}
+								copyLabel="Copy engines snippet"
+							/>
+						</div>
+						<div>
+							<p className="text-xs font-medium text-muted-foreground mb-1.5">xpack config (projectId, apiKey, host — no .env)</p>
+							<CodeBlock
+								label="package.json"
+								value={xpackConfig}
+								copyLabel="Copy xpack config"
+							/>
+						</div>
+						<div>
+							<p className="text-xs font-medium text-muted-foreground mb-1.5">Optional: docsUrl — custom payment/docs URL</p>
+							<CodeBlock
+								label="package.json"
+								value={`"xpack": {
   ...
   "docsUrl": "https://your-docs.com/pay"
 }`}
-								</pre>
-								<div className="absolute right-2 top-2">
-									<CopyButton
-										value={`"xpack": {\n  ...\n  \"docsUrl\": \"https://your-docs.com/pay\"\n}`}
-										label="Copy docsUrl snippet"
-										buttonText="Copy"
-									/>
-								</div>
-							</div>
-						</li>
-						<li>
-							<span className="font-medium text-foreground">
-								Location:
-							</span>{" "}
-							Put{" "}
-							<code className="rounded bg-muted px-1 py-0.5 font-mono">
-								preinstall.js
-							</code>{" "}
-							in your package root (same folder as{" "}
-							<code className="rounded bg-muted px-1 py-0.5 font-mono">
-								package.json
-							</code>
-							).
-						</li>
-					</ol>
-					<p className="mt-3 text-sm font-medium text-foreground">
-						Example package.json
-					</p>
-					<div className="relative mt-1">
-						<pre className="overflow-x-auto rounded-lg border bg-muted/50 p-4 text-xs font-mono">
-							<code>{examplePackageJson}</code>
-						</pre>
-						<div className="absolute right-2 top-2">
-							<CopyButton
-								value={examplePackageJson}
-								label="Copy example package.json"
-								buttonText="Copy"
+								copyLabel="Copy docsUrl snippet"
 							/>
 						</div>
 					</div>
-				</div>
+				</section>
 
-				<p className="text-sm text-muted-foreground">
-					Add{" "}
-					<code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">
-						xpack.projectId
-					</code>
-					,{" "}
-					<code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">
-						xpack.apiKey
-					</code>
-					, and{" "}
-					<code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">
-						xpack.host
-					</code>{" "}
-					to your{" "}
-					<code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">
-						package.json
-					</code>{" "}
-					(use the Project ID, API key, and app URL from this page).
-					Optional:{" "}
-					<code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">
-						xpack.docsUrl
-					</code>{" "}
-					for a custom payment/docs link. No .env required.
+				{/* Example */}
+				<section className="space-y-2">
+					<h3 className="text-sm font-semibold text-foreground">
+						Example package.json
+					</h3>
+					<p className="text-sm text-muted-foreground">
+						Full example with all required fields. Replace placeholders with your Project ID, API key, and host from Credentials above.
+					</p>
+					<CodeBlock
+						label="package.json"
+						value={examplePackageJson}
+						copyLabel="Copy example package.json"
+					/>
+				</section>
+
+				<p className="text-sm text-muted-foreground border-t border-border/60 pt-4">
+					Put <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">preinstall.js</code> in your package root (same folder as <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">package.json</code>). No .env required — use <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">xpack.projectId</code>, <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">xpack.apiKey</code>, and <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">xpack.host</code> in package.json.
 				</p>
 			</CardContent>
 		</Card>

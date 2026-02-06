@@ -56,14 +56,17 @@ export function ProjectDetailPage({
 		refetch,
 	} = useProjectByIdQuery(walletAddress ?? undefined, id);
 
-	const updateMutation = useUpdateProjectMutation(walletAddress ?? undefined, {
-		onSuccess: () => {
-			setEditingPaymentAddress(false);
+	const updateMutation = useUpdateProjectMutation(
+		walletAddress ?? undefined,
+		{
+			onSuccess: () => {
+				setEditingPaymentAddress(false);
+			},
+			onError: (err) => {
+				setUpdateError(err.message);
+			},
 		},
-		onError: (err) => {
-			setUpdateError(err.message);
-		},
-	});
+	);
 
 	const rotateMutation = useRotateProjectKeyMutation(
 		walletAddress ?? undefined,
@@ -74,17 +77,20 @@ export function ProjectDetailPage({
 			onError: (err) => {
 				setError(err.message);
 			},
-		}
+		},
 	);
 
-	const deleteMutation = useDeleteProjectMutation(walletAddress ?? undefined, {
-		onSuccess: () => {
-			router.push("/projects");
+	const deleteMutation = useDeleteProjectMutation(
+		walletAddress ?? undefined,
+		{
+			onSuccess: () => {
+				router.push("/projects");
+			},
+			onError: (err) => {
+				setError(err.message);
+			},
 		},
-		onError: (err) => {
-			setError(err.message);
-		},
-	});
+	);
 
 	// When appHost is empty (e.g. local dev), use current origin for xpack host
 	const [effectiveHost, setEffectiveHost] = useState(appHost);
@@ -97,7 +103,10 @@ export function ProjectDetailPage({
 	const handleUpdatePaymentAddress = (address: string) => {
 		if (!id || !walletAddress || !address.trim()) return;
 		setUpdateError(null);
-		updateMutation.mutate({ projectId: id, paymentAddress: address.trim() });
+		updateMutation.mutate({
+			projectId: id,
+			paymentAddress: address.trim(),
+		});
 	};
 
 	const handleRotateKey = () => {
@@ -119,7 +128,7 @@ export function ProjectDetailPage({
 
 	if (!walletAddress) {
 		return (
-			<main className="p-6">
+			<main className="min-h-full space-y-4 p-6 bg-linear-to-b from-white to-purple-50/30 dark:from-background dark:to-card/50">
 				<p className="text-sm text-muted-foreground">
 					Connect your wallet to view this project.
 				</p>
@@ -132,7 +141,7 @@ export function ProjectDetailPage({
 
 	if (loading) {
 		return (
-			<main className="p-6 w-full space-y-6">
+			<main className="min-h-full w-full space-y-6 p-6 bg-linear-to-b from-white to-purple-50/30 dark:from-background dark:to-card/50">
 				<div className="flex items-center justify-between gap-4">
 					<div className="flex items-center gap-3">
 						<div>
@@ -152,7 +161,7 @@ export function ProjectDetailPage({
 
 	if (!loading && !project) {
 		return (
-			<main className="space-y-4 p-6">
+			<main className="min-h-full space-y-4 p-6 bg-linear-to-b from-white to-purple-50/30 dark:from-background dark:to-card/50">
 				<p className="text-sm text-destructive">
 					{queryError?.message ?? "Project not found"}
 				</p>
@@ -167,18 +176,34 @@ export function ProjectDetailPage({
 	}
 
 	return (
-		<main className="p-6 w-full space-y-6">
-			<ProjectDetailHeader
-				projectName={project!.name}
-				onRemoveClick={() => {
-					setError(null);
-					setRemoveOpen(true);
-				}}
-			/>
+		<main className="min-h-full w-full p-6 bg-linear-to-b from-white to-purple-50/30 dark:from-background dark:to-card/50">
+			<div className="mx-auto max-w-4xl space-y-8">
+				<ProjectDetailHeader
+					projectName={project!.name}
+					onRemoveClick={() => {
+						setError(null);
+						setRemoveOpen(true);
+					}}
+				/>
 
-			{error ? (
-				<p className="text-sm text-destructive">{error}</p>
-			) : null}
+				{error ? (
+					<div
+						role="alert"
+						className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive"
+					>
+						{error}
+					</div>
+				) : null}
+
+				<nav aria-label="On this page" className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+					<span className="text-muted-foreground">On this page:</span>
+					<a href="#credentials" className="text-primary hover:underline font-medium">
+						Credentials & settings
+					</a>
+					<a href="#integration-guide" className="text-primary hover:underline font-medium">
+						Integration guide
+					</a>
+				</nav>
 
 			<ProjectPackageInfoCard
 				project={project!}
@@ -208,6 +233,7 @@ export function ProjectDetailPage({
 				apiKey={project!.apiKeyValue ?? undefined}
 				host={effectiveHost}
 			/>
+			</div>
 
 			<AlertDialog
 				open={rotateConfirmOpen}

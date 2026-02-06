@@ -60,11 +60,11 @@ export default function LogsPage() {
 	}
 
 	return (
-		<main className="p-6 space-y-6">
+		<main className="p-6 space-y-6 bg-linear-to-b from-white to-purple-50/30 min-h-full">
 			<header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
 				<div>
-					<h1 className="text-2xl font-semibold tracking-tight">Logs</h1>
-					<p className="mt-1 text-sm text-muted-foreground">
+					<h1 className="text-2xl font-semibold tracking-tight text-gray-900">Logs</h1>
+					<p className="mt-1 text-sm text-gray-600">
 						Install attempts and payment events across your projects
 					</p>
 				</div>
@@ -75,10 +75,10 @@ export default function LogsPage() {
 					value={projectId || "all"}
 					onValueChange={(v) => setProjectId(v === "all" ? "" : v)}
 				>
-					<SelectTrigger
-						id="filter-project"
-						className="h-9 w-[180px] border-muted-foreground/20"
-					>
+<SelectTrigger
+					id="filter-project"
+					className="h-9 w-[180px] border border-purple-200/40 bg-white rounded-lg"
+				>
 						<SelectValue placeholder="All projects" />
 					</SelectTrigger>
 					<SelectContent>
@@ -101,7 +101,7 @@ export default function LogsPage() {
 				</div>
 			) : null}
 
-			<Card>
+			<Card className="ring-0 border border-purple-200/40 bg-purple-50/50 rounded-xl shadow-sm overflow-hidden">
 				<div className="overflow-x-auto">
 					{loading ? (
 						<div className="flex items-center justify-center py-16">
@@ -109,8 +109,8 @@ export default function LogsPage() {
 						</div>
 					) : logs.length === 0 ? (
 						<div className="py-16 text-center">
-							<Package className="mx-auto size-10 text-muted-foreground/70" />
-							<p className="mt-3 text-sm font-medium text-muted-foreground">
+							<Package className="mx-auto size-10 text-purple-600/60" />
+							<p className="mt-3 text-sm font-medium text-purple-600">
 								No logs yet
 							</p>
 							<p className="mt-1 text-xs text-muted-foreground max-w-xs mx-auto">
@@ -121,7 +121,7 @@ export default function LogsPage() {
 					) : (
 						<table className="w-full text-sm">
 							<thead>
-								<tr className="border-b bg-muted/30">
+								<tr className="border-b border-purple-200/30 bg-purple-50/70">
 									<th className="text-left font-medium py-3 px-4">Time</th>
 									<th className="text-left font-medium py-3 px-4">Project</th>
 									<th className="text-left font-medium py-3 px-4">Event</th>
@@ -133,7 +133,7 @@ export default function LogsPage() {
 								{logs.map((log) => (
 									<tr
 										key={log.id}
-										className="border-b last:border-0 hover:bg-muted/20 transition-colors"
+										className="border-b border-purple-200/20 last:border-0 hover:bg-purple-50/30 transition-colors"
 									>
 										<td className="py-3 px-4 text-muted-foreground tabular-nums">
 											{format(new Date(log.timestamp), "MMM d, yyyy HH:mm:ss")}

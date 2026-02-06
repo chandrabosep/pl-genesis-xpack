@@ -20,14 +20,14 @@ export function DashboardPackageRow({
 
 	return (
 		<>
-			<tr className="border-b border-gray-100 last:border-0 transition-colors hover:bg-purple-50/50">
+			<tr className="border-b border-purple-200/20 last:border-0 transition-colors hover:bg-purple-50/50">
 				<td className="px-4 py-3 font-medium text-gray-900">{project.name}</td>
 				<td className="px-4 py-3 text-gray-600">
 					{pricingModelLabel(project.pricingModel)}
 				</td>
 				<td className="px-4 py-3 text-gray-900">{project.price ?? 0} USDC</td>
 				<td className="px-4 py-3">
-					<span className="inline-flex items-center rounded-full border border-purple-200 bg-purple-50 px-2.5 py-0.5 text-xs font-medium text-purple-700">
+					<span className="inline-flex items-center rounded-full border border-purple-200/50 bg-purple-50 px-2.5 py-0.5 text-xs font-medium text-purple-700">
 						Active
 					</span>
 				</td>

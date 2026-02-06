@@ -7,12 +7,7 @@ import { CreatePackageButton } from "@/components/projects/create-package-button
 import { DashboardPackageRow } from "@/components/projects/dashboard-package-row";
 import { useProjectsQuery } from "@/controllers/projects.query";
 import { useDashboardStatsQuery } from "@/controllers/dashboard.query";
-import {
-	Card,
-	CardHeader,
-	CardTitle,
-	CardContent,
-} from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import {
 	Select,
 	SelectContent,
@@ -21,12 +16,7 @@ import {
 	SelectValue,
 } from "@/components/ui/select";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
-import {
-	Package,
-	FolderKanban,
-	Download,
-	DollarSign,
-} from "lucide-react";
+import { Package, FolderKanban, Download, DollarSign } from "lucide-react";
 
 export default function DashboardPage() {
 	const walletAddress = useWalletAddress();
@@ -102,7 +92,7 @@ export default function DashboardPage() {
 			</header>
 
 			<section className="grid gap-4 sm:grid-cols-3">
-				<Card className="border border-gray-200 bg-white shadow-sm">
+				<Card className="ring-0 border border-purple-200/40 rounded-xl shadow-sm">
 					<CardHeader className="flex flex-row items-center justify-between pb-2">
 						<CardTitle className="text-sm font-medium text-gray-600">
 							Active projects
@@ -113,30 +103,30 @@ export default function DashboardPage() {
 						{statsLoading ? (
 							<div className="h-8 w-20 animate-pulse rounded bg-purple-50" />
 						) : (
-							<span className="text-2xl font-semibold text-gray-900">
+							<span className="text-2xl font-semibold text-purple-600">
 								{stats?.activeProjects ?? 0}
 							</span>
 						)}
 					</CardContent>
 				</Card>
-				<Card className="border border-gray-200 bg-white shadow-sm">
+				<Card className="ring-0 border border-purple-200/40 rounded-xl shadow-sm">
 					<CardHeader className="flex flex-row items-center justify-between pb-2">
 						<CardTitle className="text-sm font-medium text-gray-600">
 							Successful installs
 						</CardTitle>
-						<Download className="size-4 text-cyan-500/80" />
+						<Download className="size-4 text-purple-600/80" />
 					</CardHeader>
 					<CardContent>
 						{statsLoading ? (
 							<div className="h-8 w-20 animate-pulse rounded bg-purple-50" />
 						) : (
-							<span className="text-2xl font-semibold text-gray-900">
+							<span className="text-2xl font-semibold text-purple-600">
 								{stats?.installs ?? 0}
 							</span>
 						)}
 					</CardContent>
 				</Card>
-				<Card className="border border-gray-200 bg-white shadow-sm">
+				<Card className="ring-0 border border-purple-200/40 rounded-xl shadow-sm">
 					<CardHeader className="flex flex-row items-center justify-between pb-2">
 						<CardTitle className="text-sm font-medium text-gray-600">
 							Total revenue
@@ -147,8 +137,9 @@ export default function DashboardPage() {
 						{statsLoading ? (
 							<div className="h-8 w-20 animate-pulse rounded bg-purple-50" />
 						) : (
-							<span className="text-2xl font-semibold text-gray-900">
-								{(stats?.totalPayments ?? 0).toLocaleString()} USDC
+							<span className="text-2xl font-semibold text-purple-600">
+								{(stats?.totalPayments ?? 0).toLocaleString()}{" "}
+								USDC
 							</span>
 						)}
 					</CardContent>
@@ -164,7 +155,7 @@ export default function DashboardPage() {
 				>
 					<SelectTrigger
 						id="filter-project"
-						className="h-8 w-[160px] border-gray-200 bg-white"
+						className="h-8 w-[160px] border border-purple-200/40 bg-white rounded-lg"
 					>
 						<SelectValue placeholder="All projects" />
 					</SelectTrigger>
@@ -212,12 +203,12 @@ export default function DashboardPage() {
 					Packages
 				</h2>
 				{loading ? (
-					<div className="flex items-center justify-center rounded-xl border border-gray-200 bg-white p-4">
+					<div className="flex items-center justify-center rounded-xl border border-purple-200/40 bg-white p-4 shadow-sm">
 						<div className="flex w-full flex-col gap-3">
 							{Array.from({ length: 3 }).map((_, i) => (
 								<div
 									key={i}
-									className="flex animate-pulse items-center gap-4 border-b border-gray-100 px-4 py-3 last:border-b-0"
+									className="flex animate-pulse items-center gap-4 border-b border-purple-200/20 px-4 py-3 last:border-b-0"
 								>
 									<div className="h-8 w-8 rounded bg-purple-50" />
 									<div className="flex-1">
@@ -232,7 +223,7 @@ export default function DashboardPage() {
 						</div>
 					</div>
 				) : projects.length === 0 ? (
-					<div className="rounded-xl border border-dashed border-purple-200 bg-linear-to-br from-purple-50/50 to-cyan-50/50 py-16 text-center">
+					<div className="rounded-xl border border-dashed border-purple-200/40 bg-purple-50/50 py-16 text-center shadow-sm">
 						<Package className="mx-auto size-10 text-purple-600/60" />
 						<p className="mt-3 text-sm font-medium text-gray-700">
 							No packages yet
@@ -248,11 +239,11 @@ export default function DashboardPage() {
 						/>
 					</div>
 				) : (
-					<Card className="border border-gray-200 overflow-hidden p-0">
+					<Card className="ring-0 border border-purple-200/40 overflow-hidden p-0 rounded-xl shadow-sm">
 						<div className="overflow-x-auto">
 							<table className="w-full text-sm">
 								<thead>
-									<tr className="border-b border-gray-200 bg-purple-50">
+									<tr className="border-b border-purple-200/30 bg-purple-50">
 										<th className="px-4 py-3 text-left font-medium text-gray-900">
 											Package name
 										</th>
