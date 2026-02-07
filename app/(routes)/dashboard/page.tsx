@@ -248,6 +248,9 @@ export default function DashboardPage() {
 											Package name
 										</th>
 										<th className="px-4 py-3 text-left font-medium text-gray-900">
+											Payment type
+										</th>
+										<th className="px-4 py-3 text-left font-medium text-gray-900">
 											Pricing model
 										</th>
 										<th className="px-4 py-3 text-left font-medium text-gray-900">

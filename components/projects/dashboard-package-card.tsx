@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { ProjectSummary } from "@/types/projects";
-import { pricingModelLabel } from "@/lib/utils";
+import { pricingModelLabel, paymentTypeLabel } from "@/lib/utils";
 import {
 	useUpdateProjectMutation,
 	useRotateProjectKeyMutation,
@@ -38,12 +38,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { CopyButton } from "@/components/ui/copy-button";
-import {
-	KeyRound,
-	Loader2,
-	Pencil,
-	Trash2,
-} from "lucide-react";
+import { KeyRound, Loader2, Pencil, Trash2 } from "lucide-react";
 
 export function DashboardPackageCard({
 	project,
@@ -108,7 +103,10 @@ export function DashboardPackageCard({
 					<CardTitle className="text-base font-medium leading-tight">
 						{project.name}
 					</CardTitle>
-					<Badge variant="secondary" className="shrink-0 text-xs font-normal">
+					<Badge
+						variant="secondary"
+						className="shrink-0 text-xs font-normal"
+					>
 						{project.pricingModel}
 					</Badge>
 				</CardHeader>
@@ -118,16 +116,32 @@ export function DashboardPackageCard({
 			>
 				{embedded && (
 					<div className="text-xs text-muted-foreground">
-						<span className="font-medium text-foreground">Pricing:</span>{" "}
-						{pricingModelLabel(project.pricingModel)} · {project.price ?? 0}{" "}
-						USDC
+						<span className="font-medium text-foreground">
+							Payment type:
+						</span>{" "}
+						{paymentTypeLabel(project.receiveMode)} ·{" "}
+						<span className="font-medium text-foreground">
+							Pricing:
+						</span>{" "}
+						{pricingModelLabel(project.pricingModel)} ·{" "}
+						{project.price ?? 0}{" "}
+						{project.receiveMode === "sui" ? "SUI" : "USDC"}
 					</div>
 				)}
 				{!embedded && (
 					<>
 						<div className="text-xs text-muted-foreground">
-							<span className="font-medium text-foreground">Price:</span>{" "}
-							{project.price ?? 0} USDC
+							<span className="font-medium text-foreground">
+								Payment type:
+							</span>{" "}
+							{paymentTypeLabel(project.receiveMode)}
+						</div>
+						<div className="text-xs text-muted-foreground">
+							<span className="font-medium text-foreground">
+								Price:
+							</span>{" "}
+							{project.price ?? 0}{" "}
+							{project.receiveMode === "sui" ? "SUI" : "USDC"}
 						</div>
 						<div className="text-xs text-muted-foreground">
 							<span className="font-medium text-foreground">
@@ -217,19 +231,21 @@ export function DashboardPackageCard({
 					<AlertDialogHeader>
 						<AlertDialogTitle>Rotate API key?</AlertDialogTitle>
 						<AlertDialogDescription>
-							This will invalidate your current API key. Any integrations or
-							apps using the old key will stop working. A new key will be
-							generated. Continue?
+							This will invalidate your current API key. Any
+							integrations or apps using the old key will stop
+							working. A new key will be generated. Continue?
 						</AlertDialogDescription>
 					</AlertDialogHeader>
 					<AlertDialogFooter>
-						<AlertDialogCancel disabled={rotateMutation.isPending}>Cancel</AlertDialogCancel>
+						<AlertDialogCancel disabled={rotateMutation.isPending}>
+							Cancel
+						</AlertDialogCancel>
 						<AlertDialogAction
 							onClick={(e) => {
 								e.preventDefault();
 								void handleRotate();
 							}}
-								disabled={rotateMutation.isPending}
+							disabled={rotateMutation.isPending}
 						>
 							{rotateMutation.isPending ? (
 								<>
@@ -249,12 +265,14 @@ export function DashboardPackageCard({
 					<AlertDialogHeader>
 						<AlertDialogTitle>Remove package?</AlertDialogTitle>
 						<AlertDialogDescription>
-							This package and its API keys will be permanently deleted. This
-							cannot be undone.
+							This package and its API keys will be permanently
+							deleted. This cannot be undone.
 						</AlertDialogDescription>
 					</AlertDialogHeader>
 					<AlertDialogFooter>
-						<AlertDialogCancel disabled={deleteMutation.isPending}>Cancel</AlertDialogCancel>
+						<AlertDialogCancel disabled={deleteMutation.isPending}>
+							Cancel
+						</AlertDialogCancel>
 						<AlertDialogAction
 							variant="destructive"
 							onClick={(e) => {
@@ -276,18 +294,25 @@ export function DashboardPackageCard({
 				</AlertDialogContent>
 			</AlertDialog>
 
-			<Dialog open={updateAddressOpen} onOpenChange={setUpdateAddressOpen}>
+			<Dialog
+				open={updateAddressOpen}
+				onOpenChange={setUpdateAddressOpen}
+			>
 				<DialogContent className="sm:max-w-md">
 					<DialogHeader>
 						<DialogTitle>Update payment address</DialogTitle>
 					</DialogHeader>
 					<form onSubmit={handleUpdateAddress} className="space-y-4">
 						<div className="space-y-2">
-							<Label htmlFor="payment-address">Payment address</Label>
+							<Label htmlFor="payment-address">
+								Payment address
+							</Label>
 							<Input
 								id="payment-address"
 								value={updateAddressValue}
-								onChange={(e) => setUpdateAddressValue(e.target.value)}
+								onChange={(e) =>
+									setUpdateAddressValue(e.target.value)
+								}
 								placeholder="0x..."
 								required
 							/>
@@ -302,7 +327,10 @@ export function DashboardPackageCard({
 									Cancel
 								</Button>
 							</DialogClose>
-							<Button type="submit" disabled={updateMutation.isPending}>
+							<Button
+								type="submit"
+								disabled={updateMutation.isPending}
+							>
 								{updateMutation.isPending ? (
 									<>
 										<Loader2 className="size-4 animate-spin" />

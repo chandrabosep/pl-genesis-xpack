@@ -36,7 +36,7 @@ export function ProjectRow({ project }: { project: ProjectSummary }) {
 				</Badge>
 			</td>
 			<td className="px-4 py-3 text-gray-900">
-				{project.price != null ? `${project.price} USDC` : "—"}
+				{project.price != null ? `${project.price} ${project.receiveMode === "sui" ? "SUI" : "USDC"}` : "—"}
 			</td>
 			<td className="px-4 py-3 text-muted-foreground font-mono text-xs">
 				{shortenAddress(project.paymentAddress)}

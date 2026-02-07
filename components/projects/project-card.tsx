@@ -10,7 +10,7 @@ import { FolderKanban, ChevronRight } from "lucide-react";
 export function ProjectCard({ project }: { project: ProjectSummary }) {
 	const subtitle = [
 		pricingModelLabel(project.pricingModel),
-		project.price != null ? `${project.price} USDC` : null,
+		project.price != null ? `${project.price} ${project.receiveMode === "sui" ? "SUI" : "USDC"}` : null,
 	]
 		.filter(Boolean)
 		.join(" · ");

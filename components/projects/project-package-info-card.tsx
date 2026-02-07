@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CopyButton } from "@/components/ui/copy-button";
-import { formatDate, pricingModelLabel } from "@/lib/utils";
+import { formatDate, pricingModelLabel, paymentTypeLabel } from "@/lib/utils";
 import type { ProjectSummary } from "@/types/projects";
 import { Loader2, Pencil, RefreshCw, Check, X } from "lucide-react";
 
@@ -46,7 +46,9 @@ function DocRow({
 					{label}
 				</span>
 				{description ? (
-					<span className="text-xs text-muted-foreground/80">{description}</span>
+					<span className="text-xs text-muted-foreground/80">
+						{description}
+					</span>
 				) : null}
 			</div>
 			<div className="min-w-0">{children}</div>
@@ -69,7 +71,10 @@ export function ProjectPackageInfoCard({
 	onRefreshClick,
 }: ProjectPackageInfoCardProps) {
 	return (
-		<Card id="credentials" className="rounded-xl border border-border/80 bg-card shadow-sm scroll-mt-6">
+		<Card
+			id="credentials"
+			className="rounded-xl border border-border/80 bg-card shadow-sm scroll-mt-6"
+		>
 			<CardHeader className="space-y-1 pb-2">
 				<div className="flex items-center justify-between gap-2">
 					<CardTitle className="text-lg font-semibold tracking-tight text-foreground">
@@ -89,15 +94,21 @@ export function ProjectPackageInfoCard({
 					)}
 				</div>
 				<CardDescription className="text-sm">
-					Use these values in your app. Keep your API key secret and do not commit it to version control.
+					Use these values in your app. Keep your API key secret and
+					do not commit it to version control.
 				</CardDescription>
 			</CardHeader>
 			<CardContent className="space-y-0 pt-0">
 				<DocRow label="Package name">
-					<p className="font-medium text-foreground">{project.name}</p>
+					<p className="font-medium text-foreground">
+						{project.name}
+					</p>
 				</DocRow>
 
-				<DocRow label="Project ID" description="Use in package.json xpack.projectId">
+				<DocRow
+					label="Project ID"
+					description="Use in package.json xpack.projectId"
+				>
 					<div className="flex flex-wrap items-center gap-2">
 						<code className="min-w-0 flex-1 break-all rounded-md bg-muted/80 px-2 py-1.5 text-xs font-mono text-foreground">
 							{project.id}
@@ -112,7 +123,10 @@ export function ProjectPackageInfoCard({
 					</div>
 				</DocRow>
 
-				<DocRow label="API key" description="Keep secret. Use in package.json xpack.apiKey">
+				<DocRow
+					label="API key"
+					description="Keep secret. Use in package.json xpack.apiKey"
+				>
 					<div className="flex flex-wrap items-center gap-2">
 						<code className="min-w-0 flex-1 break-all rounded-md bg-muted/80 px-2 py-1.5 text-xs font-mono text-foreground">
 							{project.apiKeyValue ?? "—"}
@@ -146,24 +160,38 @@ export function ProjectPackageInfoCard({
 					</div>
 				</DocRow>
 
-				<DocRow label="Payment address" description="USDC received at this wallet">
+				<DocRow
+					label="Payment address"
+					description="USDC received at this wallet"
+				>
 					{editingPaymentAddress ? (
 						<div className="space-y-2">
 							<Input
 								value={inlinePaymentAddress}
-								onChange={(e) => onInlinePaymentAddressChange(e.target.value)}
+								onChange={(e) =>
+									onInlinePaymentAddressChange(e.target.value)
+								}
 								placeholder="0x..."
 								className="font-mono text-sm max-w-md"
 								disabled={updateLoading}
 							/>
 							{updateError && (
-								<p className="text-xs text-destructive">{updateError}</p>
+								<p className="text-xs text-destructive">
+									{updateError}
+								</p>
 							)}
 							<div className="flex items-center gap-2">
 								<Button
 									size="sm"
-									onClick={() => onSavePaymentAddress(inlinePaymentAddress)}
-									disabled={updateLoading || !inlinePaymentAddress.trim()}
+									onClick={() =>
+										onSavePaymentAddress(
+											inlinePaymentAddress,
+										)
+									}
+									disabled={
+										updateLoading ||
+										!inlinePaymentAddress.trim()
+									}
 								>
 									{updateLoading ? (
 										<Loader2 className="size-4 animate-spin" />
@@ -202,7 +230,11 @@ export function ProjectPackageInfoCard({
 								size="icon"
 								className="size-8 shrink-0"
 								aria-label="Edit payment address"
-								onClick={() => onStartEditPaymentAddress(project.paymentAddress)}
+								onClick={() =>
+									onStartEditPaymentAddress(
+										project.paymentAddress,
+									)
+								}
 							>
 								<Pencil className="size-3.5" />
 							</Button>
@@ -210,14 +242,30 @@ export function ProjectPackageInfoCard({
 					)}
 				</DocRow>
 
-				<DocRow label="Price (USDC)">
+				<DocRow
+					label={
+						project.receiveMode === "sui"
+							? "Price (SUI)"
+							: "Price (USDC)"
+					}
+				>
 					<p className="font-medium text-foreground">
-						{project.price != null ? `${project.price} USDC` : "—"}
+						{project.price != null
+							? `${project.price} ${project.receiveMode === "sui" ? "SUI" : "USDC"}`
+							: "—"}
 					</p>
 				</DocRow>
 
+				<DocRow label="Payment type">
+					<Badge variant="secondary">
+						{paymentTypeLabel(project.receiveMode)}
+					</Badge>
+				</DocRow>
+
 				<DocRow label="Pricing model">
-					<Badge variant="secondary">{pricingModelLabel(project.pricingModel)}</Badge>
+					<Badge variant="secondary">
+						{pricingModelLabel(project.pricingModel)}
+					</Badge>
 				</DocRow>
 
 				<DocRow label="Created">

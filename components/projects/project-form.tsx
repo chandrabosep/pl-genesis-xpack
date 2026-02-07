@@ -97,7 +97,7 @@ export function ProjectForm(props: {
 							onChange={() => props.onReceiveModeChange?.("any_chain")}
 							className="rounded border-gray-300"
 						/>
-						<span className="text-sm">Any chain (Base + Arc)</span>
+						<span className="text-sm">Any chain (Circle Gateway)</span>
 					</label>
 					<label className="flex items-center gap-2">
 						<input
@@ -119,7 +119,7 @@ export function ProjectForm(props: {
 			{!isSui && (
 				<div className="flex flex-col gap-1">
 					<label className="text-sm font-medium">
-						{receiveMode === "base" ? "USDC payment address (Base Sepolia)" : "USDC receive address (Base + Arc)"}
+						{receiveMode === "base" ? "USDC payment address (Base Sepolia)" : "USDC receive address (Circle Gateway)"}
 					</label>
 					<input
 						className="rounded border px-3 py-2 font-mono text-sm"
