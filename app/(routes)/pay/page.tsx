@@ -1239,7 +1239,9 @@ export default function PayPage() {
 														: undefined;
 												if (digest) {
 													setSuiVerifyDigest(digest);
-													await verifySuiWithDigest(digest);
+													await verifySuiWithDigest(
+														digest,
+													);
 												}
 											} catch (err) {
 												setSuiPayError(
@@ -1483,14 +1485,15 @@ export default function PayPage() {
 									<p className="max-w-full text-sm text-destructive">
 										{shortContractError(gatewayError)}
 									</p>
-									<div className="flex items-center gap-1 bg-yellow-500/30 p-2 rounded-md">
-										<Info className="size-3.5 text-yellow-700" />
-										<p className="max-w-full text-xs font-medium text-yellow-700">
-											{RETRY_HINT}
-										</p>
-									</div>
 								</div>
 							)}
+
+							<div className="mt-6 flex items-center gap-1 bg-yellow-500/30 p-2 rounded-md">
+								<Info className="size-3.5 text-yellow-700" />
+								<p className="max-w-full text-xs font-medium text-yellow-700">
+									{RETRY_HINT}
+								</p>
+							</div>
 
 							{/* Step 2c: Pay CTA */}
 							<div className="mt-4">
