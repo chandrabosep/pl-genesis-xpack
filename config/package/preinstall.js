@@ -120,6 +120,62 @@ function flushUI() {
 }
 
 /**
+ * Get the directory where npm is installing this package (the "project root" or prefix).
+ * When preinstall runs, cwd is <projectRoot>/node_modules/<pkg>, so project root is two levels up.
+ * This is where node_modules lives and where the package will appear after install.
+ */
+function getEffectiveInstallRoot() {
+	try {
+		const cwd = process.cwd();
+		if (cwd.includes("node_modules")) {
+			return path.resolve(cwd, "..", "..");
+		}
+	} catch (_) {}
+	return null;
+}
+
+/**
+ * Get the directory where the user ran `npm install` (npm sets INIT_CWD for lifecycle scripts).
+ * When this differs from the install root, npm chose a parent folder (e.g. no package.json in cwd);
+ * we can install in the user's directory instead.
+ */
+function getInitCwd() {
+	const raw = process.env.INIT_CWD;
+	if (!raw || typeof raw !== "string") return null;
+	try {
+		const resolved = path.resolve(raw);
+		if (resolved && fs.existsSync(resolved)) return resolved;
+	} catch (_) {}
+	return null;
+}
+
+/**
+ * Install this package into targetDir (where the user ran npm install) so it appears in the same directory.
+ * Ensures package.json exists there, then runs npm install <name>@<version> in that directory.
+ * Uses --ignore-scripts so the package's preinstall does not run again (we already validated in this process).
+ * Caller should exit(1) after this so the original install (in the wrong place) does not complete.
+ */
+function installInDirectory(targetDir, pkgName, pkgVersion) {
+	const { execSync } = require("child_process");
+	const packageJsonPath = path.join(targetDir, "package.json");
+	if (!fs.existsSync(packageJsonPath)) {
+		try {
+			execSync("npm init -y", { cwd: targetDir, stdio: "inherit", shell: true });
+		} catch (err) {
+			throw new Error(`Failed to create package.json: ${err.message}`);
+		}
+	}
+	const spec = pkgVersion ? `${pkgName}@${pkgVersion}` : pkgName;
+	const npm = process.env.npm_execpath || "npm";
+	const cmd = `"${npm}" install --ignore-scripts ${spec}`;
+	try {
+		execSync(cmd, { cwd: targetDir, stdio: "inherit", shell: true });
+	} catch (err) {
+		throw new Error(`Failed to install package: ${err.message}`);
+	}
+}
+
+/**
  * Release lock on package directory (Windows EBUSY fix).
  * Preinstall runs with cwd = node_modules/<pkg>; npm then needs to rename that folder.
  * Changing cwd out of the package avoids our process holding a handle so npm can rename.
@@ -226,6 +282,23 @@ async function startInstall() {
 	// Use stderr so UI shows in real time (npm shows spinner and buffers stdout)
 	logUI("");
 	logUI("Validating install (xpack)...");
+	// Where npm is installing vs where the user ran from (INIT_CWD). If different, we'll install in user's directory after payment.
+	const installRoot = getEffectiveInstallRoot();
+	const initCwd = getInitCwd();
+	const installInSameDir =
+		installRoot &&
+		initCwd &&
+		path.resolve(installRoot) !== path.resolve(initCwd);
+	if (installRoot) {
+		const displayPath = path.isAbsolute(installRoot) ? installRoot : path.resolve(installRoot);
+		logUI(`  Install location: ${displayPath}`);
+		if (installInSameDir) {
+			logUI("  (You ran from a different folder — package will be installed there after payment.)");
+		} else if (!initCwd) {
+			logUI("  (To install in a specific folder, run \"npm init -y\" there first, then npm install from there.)");
+		}
+		logUI("");
+	}
 	// On Windows, CON output is often buffered; ensure first line is visible and flush so user sees something immediately
 	if (process.platform === "win32") {
 		process.stderr.write("Validating install (xpack)...\n");
@@ -301,7 +374,35 @@ async function startInstall() {
 		try {
 			const data = JSON.parse(respText);
 			if (data && data.status === "allowed") {
-				// Enabled — allow install
+				// User ran from a different folder than npm's install root — install in the folder they ran from and abort parent install
+				if (installInSameDir && initCwd && pkg.name) {
+					const R = "\x1b[0m";
+					const DIM = "\x1b[2m";
+					const GREEN = "\x1b[92m";
+					logUI("");
+					logUI(`  ${GREEN}✓ Payment verified. Installing in your folder: ${initCwd}${R}`);
+					logUI("");
+					flushUI();
+					try {
+						releasePackageDirLock();
+						installInDirectory(initCwd, pkg.name, pkg.version || "0.0.0");
+						logUI("");
+						logUI(`  ${GREEN}✓ Success! Package installed in: ${initCwd}/node_modules/${pkg.name}${R}`);
+						logUI(`  ${DIM}(The npm error below is expected - we intentionally stopped the parent install.)${R}`);
+						logUI("");
+						flushUI();
+						// Small delay to ensure output is visible
+						const start = Date.now();
+						while (Date.now() - start < 100) {}
+						process.exit(0); // exit successfully - package is installed where user wants it
+					} catch (err) {
+						logUI(`  Could not install in ${initCwd}: ${err?.message ?? err}`);
+						logUI(`  ${DIM}Falling back to default install location.${R}`);
+						logUI("");
+						// Fall through to allow npm's install to continue
+					}
+				}
+				// Enabled — allow install (in npm's chosen location)
 				return;
 			}
 		} catch (_) {}
@@ -427,7 +528,32 @@ async function startInstall() {
 		const allowed = await pollUntilPaid(apiHost, statusPayload);
 		if (allowed) {
 			logUI("");
-			logUI(`  ${GREEN}Payment confirmed. Continuing install.${R}`);
+			logUI(`  ${GREEN}✓ Payment confirmed!${R}`);
+			if (installInSameDir && initCwd && pkg.name) {
+				// Install in the directory the user ran from so the package appears there, not in the parent
+				logUI(`  ${DIM}Installing in your folder: ${initCwd}${R}`);
+				logUI("");
+				flushUI();
+				try {
+					installInDirectory(initCwd, pkg.name, pkg.version || "0.0.0");
+					logUI("");
+					logUI(`  ${GREEN}✓ Success! Package installed in: ${initCwd}/node_modules/${pkg.name}${R}`);
+					logUI(`  ${DIM}(The npm error below is expected - we intentionally stopped the parent install.)${R}`);
+					logUI("");
+					flushUI();
+					// Small delay to ensure output is visible
+					const start = Date.now();
+					while (Date.now() - start < 100) {}
+					process.exit(0); // exit successfully - package is installed where user wants it
+				} catch (err) {
+					logUI(`  ${GOLD}Could not install in ${initCwd}: ${err?.message ?? err}${R}`);
+					logUI(`  ${DIM}Falling back to default install location.${R}`);
+					logUI("");
+				}
+			}
+			if (installRoot) {
+				logUI(`  ${DIM}Package will appear in: ${path.resolve(installRoot)}/node_modules/${pkg.name || "package"}${R}`);
+			}
 			logUI("");
 			return; // success — npm install continues automatically
 		}
