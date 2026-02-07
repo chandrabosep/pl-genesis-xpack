@@ -15,6 +15,7 @@ import {
 	Download,
 	BarChart3,
 	Lock,
+	Copy,
 } from "lucide-react";
 
 export default function LandingPage() {
@@ -26,14 +27,14 @@ export default function LandingPage() {
 			icon: Rocket,
 			title: "10× Reach",
 			description:
-				"Distribute your package globally with crypto payments. Access markets you couldn't reach before.",
+				"Get paid for your npm package with crypto. No private registry needed.",
 		},
 		{
 			id: 2,
 			icon: DollarSign,
 			title: "Recurring Revenue",
 			description:
-				"Subscriptions, per-user, and per-device licensing unlock steady income streams and predictable growth.",
+				"Unlock recurring revenue with subscription, per user, or per device licensing models to ensure reliable growth.",
 		},
 		{
 			id: 3,
@@ -51,7 +52,7 @@ export default function LandingPage() {
 			icon: Wallet,
 			title: "Connect Wallet",
 			description:
-				"Link your Web3 wallet (MetaMask, WalletConnect, Coinbase) in seconds. Your wallet address becomes your payment endpoint.",
+				"Connect your Web3 wallet instantly. Your wallet becomes your payment destination.",
 		},
 		{
 			id: 2,
@@ -59,7 +60,7 @@ export default function LandingPage() {
 			icon: Code,
 			title: "Publish Package",
 			description:
-				"Add payment config to package.json. Choose subscription, per-user, or per-device licensing. Publish to NPM as usual.",
+				"Effortlessly add payment details (subscription, per-user, or per-device) to your package.json. Publish to NPM and enjoy a smooth workflow.",
 		},
 		{
 			id: 3,
@@ -67,52 +68,52 @@ export default function LandingPage() {
 			icon: DollarSign,
 			title: "Get Paid",
 			description:
-				"Users pay with crypto on install. Funds go directly to your wallet. Withdraw anytime, no minimum threshold.",
+				"Users complete crypto payment at install. The funds are sent instantly to your wallet withdraw anytime, with no minimums.",
 		},
 	];
 
 	const featuresData = [
 		{
 			id: 1,
-			icon: Lock,
-			title: "Secure Access",
+			icon: Wallet,
+			title: "Direct Crypto Payments",
 			description:
-				"Blockchain-verified authentication ensures only paid users can access your code.",
+				"Receive payments from users instantly and directly to your wallet, without any middlemen.",
 		},
 		{
 			id: 2,
-			icon: Zap,
-			title: "Subscription & Per-User",
+			icon: DollarSign,
+			title: "Flexible Monetization",
 			description:
-				"Subscription tiers or one-time per-user (GitHub) licensing. Flexible pricing and renewal options.",
+				"Charge by subscription, user, or device. Choose the model that fits your business and update it anytime.",
 		},
 		{
 			id: 3,
-			icon: BarChart3,
-			title: "Per-Device Licensing",
+			icon: Lock,
+			title: "Package Access Control",
 			description:
-				"Track usage per device and bill accordingly. Perfect for scaling teams.",
+				"Restrict or unlock npm package installs based on blockchain-verified payment. Automated access revocation for expiring subscriptions.",
 		},
 		{
 			id: 4,
-			icon: Wallet,
-			title: "Crypto Payments",
+			icon: BarChart3,
+			title: "Usage Tracking",
 			description:
-				"Accept payments in multiple cryptocurrencies with instant settlement to your wallet.",
+				"Track installs by user or device. Get analytics for your paid packages and understand your audience.",
 		},
 		{
 			id: 5,
 			icon: Download,
-			title: "Paid Npm Packages",
+			title: "Seamless NPM Integration",
 			description:
-				"Seamless integration and monitize your packages easily with existing NPM workflow and tooling.",
+				"Use your normal npm workflow. No custom registry or package manager required—just add preinstall script.",
 		},
 		{
 			id: 6,
 			icon: CircleDollarSign,
-			title: "Multi-Currency Payments",
+			title: "Multi-chain & Multi-currency",
 			description:
-				"Accept payments in ETH, USDC, DAI, and more with instant settlement.",
+				"Accept ETH, USDC, and more on major EVM chains and Sui. Get paid in your preferred currency.",
 		},
 	];
 
@@ -205,6 +206,68 @@ export default function LandingPage() {
 									title={step.title}
 									description={step.description}
 								/>
+							))}
+						</div>
+					</div>
+				</section>
+
+				<section className="px-4 py-12 sm:px-6 lg:px-8 reveal-up">
+					<div className="mb-10 flex flex-col items-center gap-y-10">
+						<h2 className="text-3xl md:text-4xl font-bold tracking-tight">
+							Explore Xpack{" "}
+							<span className="bg-purple-600 bg-clip-text text-transparent">
+								Modules
+							</span>
+						</h2>
+						<div className="grid gap-3 w-full max-w-xl">
+							{[
+								{
+									label: "Arc",
+									sub: "(USDC via Circle Gateway)",
+									package: "xpack-arc-gateway",
+								},
+								{
+									label: "Sui payments",
+									package: "xpack-sui",
+								},
+								{
+									label: "Per-device pricing",
+									package: "xpack-per-device",
+								},
+							].map(({ label, sub, package: pkg }) => (
+								<div
+									key={pkg}
+									className="rounded-lg border px-5 py-4 flex items-center justify-between"
+								>
+									<div>
+										<span className="font-semibold text-foreground">
+											{label}
+										</span>
+										{sub && (
+											<span className="ml-2 text-xs text-primary align-middle">
+												{sub}
+											</span>
+										)}
+									</div>
+									<div className="flex items-center gap-2">
+										<code className="bg-background rounded px-2 py-1 text-purple-700 font-mono text-sm">
+											npm i {pkg}
+										</code>
+										<button
+											type="button"
+											onClick={() => {
+												navigator.clipboard.writeText(
+													`npm i ${pkg}`,
+												);
+											}}
+											className="ml-1 p-1 rounded hover:bg-muted transition-colors cursor-pointer "
+											title="Copy to clipboard"
+											aria-label={`Copy npm install for ${pkg}`}
+										>
+											<Copy className="w-4 h-4 text-purple-700" />
+										</button>
+									</div>
+								</div>
 							))}
 						</div>
 					</div>
