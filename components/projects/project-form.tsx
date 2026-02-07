@@ -1,5 +1,6 @@
 "use client";
 
+import { getSuiNetwork } from "@/lib/x402/payment-config";
 import { PricingModel } from "@/types/constants";
 import { ProjectSummary } from "@/types/projects";
 import {
@@ -150,7 +151,7 @@ export function ProjectForm(props: {
 						required
 					/>
 					<p className="text-xs text-muted-foreground">
-						Users pay in SUI to this address on Sui {process.env.NEXT_PUBLIC_SUI_NETWORK === "testnet" ? "testnet" : "mainnet"}.
+						Users pay in SUI to this address on Sui {getSuiNetwork()}.
 					</p>
 				</div>
 			)}

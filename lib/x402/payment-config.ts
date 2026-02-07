@@ -236,13 +236,10 @@ const SUI_MAINNET_RPC_DEFAULT = "https://fullnode.mainnet.sui.io:443";
 const SUI_TESTNET_RPC_DEFAULT = "https://fullnode.testnet.sui.io:443";
 
 /**
- * Current Sui network for payments.
- * Set SUI_NETWORK=testnet or NEXT_PUBLIC_SUI_NETWORK=testnet to use testnet (e.g. for testing).
+ * Current Sui network for payments. Always testnet (no env).
  */
 export function getSuiNetwork(): SuiNetwork {
-	const v = process.env.SUI_NETWORK ?? process.env.NEXT_PUBLIC_SUI_NETWORK;
-	if (v === "testnet") return "testnet";
-	return "mainnet";
+	return "testnet";
 }
 
 /**

@@ -694,6 +694,36 @@ export default function PayPage() {
 		}
 	};
 
+	const verifySuiWithDigest = useCallback(
+		async (digest: string) => {
+			if (state.status !== "ready" || !state.suiPaymentOption) return;
+			setSuiVerifyError(null);
+			setSuiVerifying(true);
+			try {
+				const res = await fetch("/api/install/verify", {
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({
+						sessionToken: state.sessionToken,
+						transactionDigest: digest,
+						paymentType: "sui",
+					}),
+				});
+				const data = await res.json().catch(() => ({}));
+				if (res.ok && data.verified) {
+					setState({ status: "verified" });
+				} else {
+					setSuiVerifyError(data.error ?? "Verification failed");
+				}
+			} catch {
+				setSuiVerifyError("Verification failed");
+			} finally {
+				setSuiVerifying(false);
+			}
+		},
+		[state],
+	);
+
 	const handleVerifySui = async (e: React.FormEvent<HTMLFormElement>) => {
 		e.preventDefault();
 		if (state.status !== "ready" || !state.suiPaymentOption) return;
@@ -703,29 +733,7 @@ export default function PayPage() {
 			) as HTMLInputElement
 		)?.value?.trim();
 		if (!digest) return;
-		setSuiVerifyError(null);
-		setSuiVerifying(true);
-		try {
-			const res = await fetch("/api/install/verify", {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({
-					sessionToken: state.sessionToken,
-					transactionDigest: digest,
-					paymentType: "sui",
-				}),
-			});
-			const data = await res.json().catch(() => ({}));
-			if (res.ok && data.verified) {
-				setState({ status: "verified" });
-			} else {
-				setSuiVerifyError(data.error ?? "Verification failed");
-			}
-		} catch {
-			setSuiVerifyError("Verification failed");
-		} finally {
-			setSuiVerifying(false);
-		}
+		await verifySuiWithDigest(digest);
 	};
 
 	if (state.status === "loading") {
@@ -1229,8 +1237,10 @@ export default function PayPage() {
 																}
 															).digest
 														: undefined;
-												if (digest)
+												if (digest) {
 													setSuiVerifyDigest(digest);
+													await verifySuiWithDigest(digest);
+												}
 											} catch (err) {
 												setSuiPayError(
 													err instanceof Error

@@ -1,7 +1,6 @@
 /**
- * Verify a native SUI transfer by transaction digest (mainnet or testnet).
+ * Verify a native SUI transfer by transaction digest (testnet).
  * Uses balance changes: recipient must have a positive SUI balance change >= expected amount.
- * Network is controlled by SUI_NETWORK / NEXT_PUBLIC_SUI_NETWORK (testnet | mainnet).
  */
 
 import { SuiJsonRpcClient } from "@mysten/sui/jsonRpc";
