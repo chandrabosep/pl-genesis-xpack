@@ -11,11 +11,8 @@ import {
 	useSignTypedData,
 } from "wagmi";
 import { useAppKit } from "@reown/appkit/react";
-import { AlertCircle, Wallet, Hash } from "lucide-react";
-import {
-	SUPPORTED_CHAINS,
-	SUI_DECIMALS,
-} from "@/lib/x402/payment-config";
+import { AlertCircle, Wallet, Hash, Info } from "lucide-react";
+import { SUPPORTED_CHAINS, SUI_DECIMALS } from "@/lib/x402/payment-config";
 import { CopyButton } from "@/components/ui/copy-button";
 import { Button } from "@/components/ui/button";
 import {
@@ -100,6 +97,29 @@ const GATEWAY_DEPOSIT_AMOUNT_USDC = 2;
 const GATEWAY_DEPOSIT_AMOUNT_UNITS = BigInt(
 	GATEWAY_DEPOSIT_AMOUNT_USDC * 1_000_000,
 );
+
+const MAX_ERROR_CHARS = 80;
+
+/** Short, user-friendly message for contract revert and other long RPC errors. Never returns long or raw call data. */
+function shortContractError(message: string | undefined): string {
+	if (!message || typeof message !== "string")
+		return "Transaction failed. Try again.";
+	// Hide raw viem/RPC revert blobs (hex data, gas, nonce, etc.)
+	if (
+		/execution reverted|Raw Call Arguments|data: 0x|maxFeePerGas|nonce: \d+/i.test(
+			message,
+		)
+	)
+		return "Transaction reverted on-chain.";
+	if (message.includes("gasLimit") || message.includes("destructure"))
+		return "Transaction could not be prepared. Check network and balance, then try again.";
+	if (message.length > MAX_ERROR_CHARS)
+		return `${message.slice(0, MAX_ERROR_CHARS - 1)}…`;
+	return message;
+}
+
+const RETRY_HINT =
+	"If it failed the first time, try again. It often succeeds on retry.";
 
 /** True when the wallet user rejected/cancelled the transaction (e.g. MetaMask "Reject"). */
 function isUserRejectedRequestError(err: unknown): boolean {
@@ -210,10 +230,8 @@ export default function PayPage() {
 	const [suiConnectOpen, setSuiConnectOpen] = useState(false);
 	const [suiPayError, setSuiPayError] = useState<string | null>(null);
 	const suiWallet = useCurrentWallet();
-	const {
-		mutateAsync: signAndExecuteSui,
-		isPending: suiSignPending,
-	} = useSignAndExecuteTransaction();
+	const { mutateAsync: signAndExecuteSui, isPending: suiSignPending } =
+		useSignAndExecuteTransaction();
 	const gatewayDepositRef = useRef<{
 		phase: "approve" | "deposit";
 		usdcAddress: string;
@@ -234,8 +252,12 @@ export default function PayPage() {
 	const { signTypedDataAsync } = useSignTypedData();
 
 	// Wait for tx to be mined before we call verify (avoids "Transaction not found")
-	const { data: receipt, isSuccess: isReceiptSuccess } =
-		useWaitForTransactionReceipt({ hash: txHash ?? undefined });
+	const {
+		data: receipt,
+		isSuccess: isReceiptSuccess,
+		isError: isReceiptError,
+		error: receiptError,
+	} = useWaitForTransactionReceipt({ hash: txHash ?? undefined });
 
 	const paymentUri =
 		state.status === "ready" ||
@@ -273,13 +295,37 @@ export default function PayPage() {
 		);
 	}, [txHash]);
 
-	// When any write fails (rejected or reverted), clear gateway deposit flow so "Deposit" / "Confirm approve" is unblocked and retryable
+	// When any write fails (rejected or reverted), show short error in UI, clear gateway deposit flow, and unblock so user can retry
 	useEffect(() => {
 		if (!isWriteError || !writeError) return;
 		gatewayDepositRef.current = null;
-		setGatewayError(null);
+		const raw =
+			writeError?.message ?? "Transaction failed. You can try again.";
+		setGatewayError(
+			isUserRejectedRequestError(writeError)
+				? "Transaction cancelled. You can try again."
+				: shortContractError(raw),
+		);
 		setGatewayStep("idle");
 	}, [isWriteError, writeError]);
+
+	// When tx was submitted but reverted on-chain (e.g. Arc mint failed), show short error and return to ready so user can retry
+	useEffect(() => {
+		if (!isReceiptError || !receiptError || !payingForSessionRef.current)
+			return;
+		const payload = readyPayloadRef.current;
+		payingForSessionRef.current = null;
+		readyPayloadRef.current = null;
+		setGatewayError(
+			shortContractError(
+				receiptError?.message ??
+					"Transaction failed on-chain. You can try again.",
+			),
+		);
+		setGatewayStep("idle");
+		if (payload) setState({ ...payload, status: "ready" });
+		resetWriteContract?.();
+	}, [isReceiptError, receiptError, resetWriteContract]);
 
 	// Gateway deposit flow: after approve confirms, run deposit; after deposit confirms, mark done
 	useEffect(() => {
@@ -459,9 +505,9 @@ export default function PayPage() {
 				gas: GAS_GATEWAY_MINT,
 			});
 		} catch (err) {
-			setGatewayError(
-				err instanceof Error ? err.message : "Gateway payment failed",
-			);
+			const raw =
+				err instanceof Error ? err.message : "Gateway payment failed";
+			setGatewayError(shortContractError(raw));
 			setGatewayStep("idle");
 		}
 	}, [
@@ -500,9 +546,8 @@ export default function PayPage() {
 			});
 		} catch (err) {
 			gatewayDepositRef.current = null;
-			setGatewayError(
-				err instanceof Error ? err.message : "Deposit failed",
-			);
+			const raw = err instanceof Error ? err.message : "Deposit failed";
+			setGatewayError(shortContractError(raw));
 		}
 	}, [
 		isConnected,
@@ -971,35 +1016,36 @@ export default function PayPage() {
 										? "Transaction cancelled"
 										: "Payment failed"}
 								</p>
-								<p
-									className={`mt-1 text-sm ${
+								<div
+									className={`mt-1 max-w-full overflow-hidden break-words text-sm ${
 										isUserRejectedRequestError(writeError)
 											? "text-muted-foreground"
 											: "text-destructive/90"
 									}`}
 								>
-									{(() => {
-										if (
-											isUserRejectedRequestError(
-												writeError,
-											)
-										) {
-											return "You can try again when ready.";
-										}
-										const msg = writeError?.message ?? "";
-										// Gas estimation failed (e.g. RPC returned null) — show friendly message
-										if (
-											msg.includes("gasLimit") ||
-											msg.includes("destructure")
-										) {
-											return "Transaction could not be prepared. Check your network connection and balance, then try again.";
-										}
-										return (
-											msg ||
-											"Transaction was rejected or failed. Check your balance and try again."
-										);
-									})()}
-								</p>
+									<p>
+										{(() => {
+											if (
+												isUserRejectedRequestError(
+													writeError,
+												)
+											) {
+												return "You can try again when ready.";
+											}
+											return shortContractError(
+												writeError?.message ??
+													"Transaction was rejected or failed. Check your balance and try again.",
+											);
+										})()}
+									</p>
+									{!isUserRejectedRequestError(
+										writeError,
+									) && (
+										<p className="mt-1 text-xs text-muted-foreground">
+											{RETRY_HINT}
+										</p>
+									)}
+								</div>
 							</div>
 						</div>
 					)}
@@ -1118,23 +1164,34 @@ export default function PayPage() {
 								{/* Open Sui Wallet extension to pay (connect if needed, then sign & execute) */}
 								<div className="flex flex-col gap-2">
 									<ConnectModal
-										trigger={<span className="hidden" aria-hidden />}
+										trigger={
+											<span
+												className="hidden"
+												aria-hidden
+											/>
+										}
 										open={suiConnectOpen}
 										onOpenChange={setSuiConnectOpen}
 									/>
 									<Button
 										type="button"
-										disabled={suiVerifying || suiSignPending}
+										disabled={
+											suiVerifying || suiSignPending
+										}
 										onClick={async () => {
 											const opt = state.suiPaymentOption!;
 											setSuiPayError(null);
-											if (suiWallet.connectionStatus === "disconnected") {
+											if (
+												suiWallet.connectionStatus ===
+												"disconnected"
+											) {
 												setSuiConnectOpen(true);
 												return;
 											}
 											const amountMist = BigInt(
 												Math.ceil(
-													parseFloat(opt.amountSui) * 10 ** SUI_DECIMALS,
+													parseFloat(opt.amountSui) *
+														10 ** SUI_DECIMALS,
 												),
 											);
 											const chain =
@@ -1142,42 +1199,66 @@ export default function PayPage() {
 													? "sui:testnet"
 													: "sui:mainnet";
 											const tx = new Transaction();
-											const [coin] = tx.splitCoins(tx.gas, [amountMist]);
-											tx.transferObjects([coin], opt.suiAddress);
+											const [coin] = tx.splitCoins(
+												tx.gas,
+												[amountMist],
+											);
+											tx.transferObjects(
+												[coin],
+												opt.suiAddress,
+											);
 											try {
-												const result = await signAndExecuteSui({
-													transaction: tx,
-													chain,
-												});
+												const result =
+													await signAndExecuteSui({
+														transaction: tx,
+														chain,
+													});
 												const digest =
-													typeof result === "object" &&
+													typeof result ===
+														"object" &&
 													result !== null &&
 													"digest" in result &&
-													typeof (result as { digest?: string }).digest === "string"
-														? (result as { digest: string }).digest
+													typeof (
+														result as {
+															digest?: string;
+														}
+													).digest === "string"
+														? (
+																result as {
+																	digest: string;
+																}
+															).digest
 														: undefined;
-												if (digest) setSuiVerifyDigest(digest);
+												if (digest)
+													setSuiVerifyDigest(digest);
 											} catch (err) {
 												setSuiPayError(
-													err instanceof Error ? err.message : "Transaction failed",
+													err instanceof Error
+														? err.message
+														: "Transaction failed",
 												);
 											}
 										}}
 										className="w-full rounded-md border-2 border-[#6fbcf0] bg-[#6fbcf0] py-3 font-semibold text-white hover:bg-[#5aabdf] hover:text-white"
 									>
-										{suiWallet.connectionStatus === "disconnected"
+										{suiWallet.connectionStatus ===
+										"disconnected"
 											? "Connect Sui Wallet"
 											: suiSignPending
 												? "Confirm in wallet…"
 												: "Pay with Sui Wallet"}
 									</Button>
 									{suiPayError && (
-										<p className="text-center text-sm text-destructive" role="alert">
+										<p
+											className="text-center text-sm text-destructive"
+											role="alert"
+										>
 											{suiPayError}
 										</p>
 									)}
 									<p className="text-center text-xs text-muted-foreground">
-										{suiWallet.connectionStatus === "disconnected"
+										{suiWallet.connectionStatus ===
+										"disconnected"
 											? "Connect your Sui wallet extension to pay"
 											: "Opens your Sui wallet extension to sign and send"}
 									</p>
@@ -1369,7 +1450,7 @@ export default function PayPage() {
 											isWritePending ||
 											!!gatewayDepositRef.current
 										}
-										className="rounded-lg border-amber-500/40 bg-amber-500/15 text-amber-800 hover:bg-amber-500/25 dark:text-amber-200 dark:hover:bg-amber-500/20"
+										className="rounded-lg border-purple-500/40 bg-purple-500/15 text-purple-800 hover:text-purple-800 hover:bg-purple-500/25 dark:text-purple-200 dark:hover:bg-purple-500/20"
 									>
 										{gatewayDepositRef.current
 											? gatewayDepositRef.current
@@ -1385,12 +1466,20 @@ export default function PayPage() {
 							</div>
 
 							{gatewayError && (
-								<p
-									className="mt-2 text-sm text-destructive"
+								<div
+									className="mt-4 max-w-full overflow-hidden space-y-4"
 									role="alert"
 								>
-									{gatewayError}
-								</p>
+									<p className="max-w-full text-sm text-destructive">
+										{shortContractError(gatewayError)}
+									</p>
+									<div className="flex items-center gap-1 bg-yellow-500/30 p-2 rounded-md">
+										<Info className="size-3.5 text-yellow-700" />
+										<p className="max-w-full text-xs font-medium text-yellow-700">
+											{RETRY_HINT}
+										</p>
+									</div>
+								</div>
 							)}
 
 							{/* Step 2c: Pay CTA */}
