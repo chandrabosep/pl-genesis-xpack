@@ -1,44 +1,50 @@
-# Xpack — Monetize NPM packages with crypto
+# Xpack - Installs that finally pays!!
 
-Connect your wallet, add payment config to your package, and get paid in crypto when users install. No backend, no payment processors—just Web3 monetization.
+<img width="1471" alt="image" src="./public/1.jpg">
 
-**Features:** Per-device & subscription pricing · USDC (EVM) + SUI payments · Dashboard & logs · Multi-chain (Base, Ethereum Sepolia, Avalanche Fuji, Sonic, Arc, Sui, etc.)
+##
+**Xpack** is a crypto-native monetization platform for npm packages, built to let developers turn their open-source code into a global business. Authors connect a wallet, add a small configuration and preinstall script to their package, and receive on-chain payments directly to their wallet—no custom backends, payment processors, or bank accounts required. Users pay with **USDC** on supported EVM chains or **native SUI** on the Sui network at install time; once payment is confirmed, the installation continues automatically. Xpack bridges traditional package distribution with on-chain payments and gives authors a unified dashboard to manage pricing, track revenue and installs, and accept cross-chain payments via **Circle's Gateway** without handling bridge complexity.
 
-👉 **Full description, features & pricing:** [PRODUCT.md](./PRODUCT.md)
+## Features
 
----
+- **Frictionless for authors**: Get started in minutes—connect your Web3 wallet, add payment config and a preinstall script to your package, publish to npm, and start earning. No complex setup or private registries.
 
-## Getting Started
+- **Pay at install**: Users pay with USDC or SUI when they run `npm install`; funds are sent to the author’s wallet and the install completes automatically. No separate checkout or confusing flows.
 
-First, run the development server:
+- **Flexible pricing models**: Support per-device, per-user, or subscription licensing from one dashboard. Set your own pricing and update it anytime.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+- **Cross-chain without the hassle**: Accept USDC on EVM chains and native SUI on Sui. Circle’s Gateway handles cross-chain flows so you don’t manage bridges or multiple integrations.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+- **Real-time dashboard**: View revenue, installs, and payment status in one place. Track performance and manage your monetized packages from a single interface.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Test packages
 
-## Learn More
+| Package                           | Description                |
+| --------------------------------- | -------------------------- |
+| **Arc (USDC via Circle Gateway)** | `npm i xpack-arc-gateway`  |
+| **Sui payments**                  | `npm i xpack-sui`          |
+| **Per-device pricing**            | `npm i xpack-per-device`   |
+| **Per-user pricing**              | `npm i xpack-per-user`     |
+| **Subscription pricing**         | `npm i xpack-subscription` |
 
-To learn more about Next.js, take a look at the following resources:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Why this matters
 
-## Deploy on Vercel
+| Key Metric                        | Value / Impact                                                    |
+| --------------------------------- | ----------------------------------------------------------------- |
+| **2.6B+** weekly npm downloads    | Across 32M+ developers and businesses                             |
+| **0** native monetization         | No built-in way to charge for npm packages today                  |
+| **480K+** potential paid packages | A massive, untapped monetization opportunity across the ecosystem |
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Team
+
+Meet the team behind GHOat:
+
+- **Chandra Bose:** Full Stack  Developer / [Twitter](https://x.com/Chandra_Bose31)
+- **Shivathmika** Full Stack Developer  / [Twitter](https://x.com/_shivathmika)
+- **Chetana:** Product Manager / [Twitter](https://x.com/fixerpabo_13)
+- **Rahul:** Product Manager / [Twitter](https://x.com/rahulinweb)
+
