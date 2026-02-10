@@ -435,7 +435,11 @@ export default function PayPage() {
 	]);
 
 	const handlePayWithGateway = useCallback(async () => {
-		if (state.status !== "ready" || !walletAddress) return;
+		if (state.status !== "ready") return;
+		if (!isConnected || !walletAddress) {
+			open({ view: "Connect" });
+			return;
+		}
 		setGatewayError(null);
 		setGatewayStep("loading");
 		try {
@@ -512,7 +516,9 @@ export default function PayPage() {
 		}
 	}, [
 		state,
+		isConnected,
 		walletAddress,
+		open,
 		gatewaySourceChainId,
 		chain?.id,
 		switchChainAsync,
@@ -1504,12 +1510,12 @@ export default function PayPage() {
 									type="button"
 									onClick={handlePayWithGateway}
 									disabled={
-										!isConnected ||
 										subscriptionNeedsGithub ||
-										gatewayStep === "loading" ||
-										gatewayStep === "sign" ||
-										gatewayStep === "request" ||
-										isWritePending
+										(isConnected &&
+											(gatewayStep === "loading" ||
+												gatewayStep === "sign" ||
+												gatewayStep === "request" ||
+												isWritePending))
 									}
 									className="w-full rounded-md py-3 font-medium"
 								>

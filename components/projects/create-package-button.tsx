@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { PricingModel } from "@/types/constants";
 import { ProjectForm } from "@/components/projects/project-form";
@@ -33,6 +33,14 @@ export function CreatePackageButton({
 	const [receiveMode, setReceiveMode] = useState<"base" | "any_chain" | "sui">("base");
 	const [unifiedReceiveAddress, setUnifiedReceiveAddress] = useState("");
 	const [suiAddress, setSuiAddress] = useState("");
+
+	// Default payment address to connected wallet when dialog opens
+	useEffect(() => {
+		if (open && walletAddress) {
+			setPaymentAddress((prev) => prev || walletAddress);
+			setUnifiedReceiveAddress((prev) => prev || walletAddress);
+		}
+	}, [open, walletAddress]);
 
 	const createProject = useCreateProjectMutation(walletAddress, {
 		onSuccess: (project) => {
