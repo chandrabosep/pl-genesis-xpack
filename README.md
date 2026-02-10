@@ -41,7 +41,7 @@
 
 ## Team
 
-Meet the team behind GHOat:
+Meet the team behind Xpack:
 
 - **Chandra Bose:** Full Stack  Developer / [Twitter](https://x.com/Chandra_Bose31)
 - **Shivathmika** Full Stack Developer  / [Twitter](https://x.com/_shivathmika)
