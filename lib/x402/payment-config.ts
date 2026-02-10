@@ -287,3 +287,31 @@ export function isValidSuiAddress(addr: string): boolean {
 	const trimmed = addr.trim();
 	return /^0x[a-fA-F0-9]{64}$/.test(trimmed);
 }
+
+/** Block explorer base URLs for testnet chains (for transaction links after payment). */
+const BLOCK_EXPLORER_BASE_BY_CHAIN: Record<number, string> = {
+	[ETHEREUM_SEPOLIA_CHAIN_ID]: "https://sepolia.etherscan.io",
+	[AVALANCHE_FUJI_CHAIN_ID]: "https://testnet.snowtrace.io",
+	[BASE_SEPOLIA_CHAIN_ID]: "https://sepolia.basescan.org",
+	[SONIC_TESTNET_CHAIN_ID]: "https://testnet.sonicscan.org",
+	[WORLD_CHAIN_SEPOLIA_CHAIN_ID]: "https://sepolia.worldscan.org",
+	[SEI_ATLANTIC_CHAIN_ID]: "https://seitrace.com",
+	[HYPEREVM_TESTNET_CHAIN_ID]: "https://testnet.purrsec.com",
+	[ARC_TESTNET_CHAIN_ID]: "https://testnet.arcscan.app",
+};
+
+/** EVM: URL to view a transaction on the chain's block explorer (testnet). */
+export function getBlockExplorerTxUrl(chainId: number, transactionHash: string): string | null {
+	const base = BLOCK_EXPLORER_BASE_BY_CHAIN[chainId];
+	if (!base || !transactionHash?.trim()) return null;
+	return `${base.replace(/\/$/, "")}/tx/${transactionHash.trim()}`;
+}
+
+/** Sui testnet explorer base URL. */
+const SUI_TESTNET_EXPLORER_BASE = "https://testnet.suivision.xyz";
+
+/** Sui: URL to view a transaction on testnet explorer. */
+export function getSuiTestnetTxUrl(transactionDigest: string): string | null {
+	if (!transactionDigest?.trim()) return null;
+	return `${SUI_TESTNET_EXPLORER_BASE}/tx/${transactionDigest.trim()}`;
+}

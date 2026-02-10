@@ -12,7 +12,12 @@ import {
 } from "wagmi";
 import { useAppKit } from "@reown/appkit/react";
 import { AlertCircle, Wallet, Hash, Info } from "lucide-react";
-import { SUPPORTED_CHAINS, SUI_DECIMALS } from "@/lib/x402/payment-config";
+import {
+	SUPPORTED_CHAINS,
+	SUI_DECIMALS,
+	getBlockExplorerTxUrl,
+	getSuiTestnetTxUrl,
+} from "@/lib/x402/payment-config";
 import { CopyButton } from "@/components/ui/copy-button";
 import { Button } from "@/components/ui/button";
 import {
@@ -178,7 +183,13 @@ type SessionState =
 	| ({ status: "ready" } & ReadyPayload)
 	| ({ status: "confirming" } & ReadyPayload) // tx submitted, waiting for block
 	| ({ status: "verifying" } & ReadyPayload) // tx mined, checking on our server
-	| { status: "verified" }
+	| ({
+			status: "verified";
+			transactionHash?: string;
+			chainId?: number;
+			transactionDigest?: string;
+			suiNetwork?: "mainnet" | "testnet";
+	  })
 	| { status: "verify_error"; error: string };
 
 export default function PayPage() {
@@ -375,7 +386,12 @@ export default function PayPage() {
 		})
 			.then((res) => res.json())
 			.then((result) => {
-				if (result.verified) setState({ status: "verified" });
+				if (result.verified)
+					setState({
+						status: "verified",
+						transactionHash: txHash,
+						chainId,
+					});
 				else
 					setState({
 						status: "verify_error",
@@ -688,7 +704,11 @@ export default function PayPage() {
 			});
 			const data = await res.json().catch(() => ({}));
 			if (res.ok && data.verified) {
-				setState({ status: "verified" });
+				setState({
+					status: "verified",
+					transactionHash: txHash,
+					chainId,
+				});
 			} else {
 				setState({
 					status: "verify_error",
@@ -717,7 +737,11 @@ export default function PayPage() {
 				});
 				const data = await res.json().catch(() => ({}));
 				if (res.ok && data.verified) {
-					setState({ status: "verified" });
+					setState({
+						status: "verified",
+						transactionDigest: digest,
+						suiNetwork: state.suiPaymentOption?.network ?? "testnet",
+					});
 				} else {
 					setSuiVerifyError(data.error ?? "Verification failed");
 				}
@@ -775,6 +799,16 @@ export default function PayPage() {
 	}
 
 	if (state.status === "verified") {
+		const evmTxUrl =
+			state.transactionHash && state.chainId
+				? getBlockExplorerTxUrl(state.chainId, state.transactionHash)
+				: null;
+		const suiTxUrl =
+			state.transactionDigest && state.suiNetwork === "testnet"
+				? getSuiTestnetTxUrl(state.transactionDigest)
+				: null;
+		const txUrl = evmTxUrl ?? suiTxUrl;
+
 		return (
 			<main className="mx-auto max-w-xl px-6 py-12">
 				<div className="rounded-2xl border border-border bg-card p-8 shadow-sm">
@@ -801,6 +835,29 @@ export default function PayPage() {
 							<p className="mt-0.5 text-sm text-muted-foreground">
 								You can re-run the install command now.
 							</p>
+							{txUrl && (
+								<a
+									href={txUrl}
+									target="_blank"
+									rel="noopener noreferrer"
+									className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
+								>
+									View testnet transaction
+									<svg
+										className="h-3.5 w-3.5"
+										fill="none"
+										viewBox="0 0 24 24"
+										stroke="currentColor"
+										strokeWidth={2}
+									>
+										<path
+											strokeLinecap="round"
+											strokeLinejoin="round"
+											d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+										/>
+									</svg>
+								</a>
+							)}
 						</div>
 					</div>
 				</div>
