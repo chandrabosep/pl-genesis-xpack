@@ -55,14 +55,14 @@ export const metadata: Metadata = {
 		"per-user",
 		"subscription",
 	],
-	authors: [{ name: "Xpack", url: "https://hack-money-xpack.vercel.app/" }],
+	authors: [{ name: "Xpack", url: "https://hack-money-xpack-one.vercel.app/" }],
 	creator: "Xpack",
 	publisher: "Xpack",
 	openGraph: {
 		title: "Xpack - Monetize your NPM packages with crypto",
 		description:
 			"Xpack is a Web3 platform that lets npm package authors monetize their packages with crypto. Authors connect a wallet, add a small payment config and preinstall script to their package.json, and get paid when users install—no custom backend or traditional payment processor; payments are on-chain. When someone runs `npm install`, the preinstall script talks to the project’s install API. If payment is required, the API returns **402 Payment Required** with payment details and the user is sent to a pay page to connect their wallet and pay in **USDC (EVM)** or **native SUI**. Authors can set **per-device**, **per-user**, or **subscription** pricing and manage projects and payment history from the dashboard.",
-		url: "https://hack-money-xpack.vercel.app/",
+		url: "https://hack-money-xpack-one.vercel.app/",
 		siteName: "Xpack",
 		locale: "en_US",
 		type: "website",
