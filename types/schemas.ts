@@ -7,7 +7,7 @@ const pricingModelSchema = z.enum([
 	"per_user",
 ] as const satisfies readonly PricingModel[]);
 
-export const receiveModeSchema = z.enum(["base", "any_chain", "sui"]);
+export const receiveModeSchema = z.enum(["base", "sui", "starknet"]);
 
 const suiAddressSchema = z
 	.string()
@@ -21,6 +21,21 @@ const suiAddressSchema = z
 		{ message: "Sui address must be 0x followed by 64 hex characters" },
 	);
 
+const starknetAddressSchema = z
+	.string()
+	.optional()
+	.refine(
+		(v) =>
+			v === undefined ||
+			v === null ||
+			v.trim() === "" ||
+			/^0x[a-fA-F0-9]{1,64}$/.test(v.trim()),
+		{
+			message:
+				"Starknet address must be 0x followed by 1 to 64 hex characters",
+		},
+	);
+
 export const projectCreateSchema = z
 	.object({
 		name: z.string().min(1),
@@ -30,12 +45,8 @@ export const projectCreateSchema = z
 		receiveMode: receiveModeSchema.optional().default("base"),
 		unifiedReceiveAddress: z.string().min(1).optional(),
 		suiAddress: suiAddressSchema,
+		starknetAddress: starknetAddressSchema,
 	})
-	.refine(
-		(data) =>
-			data.receiveMode !== "any_chain" || (data.unifiedReceiveAddress?.trim().length ?? 0) > 0,
-		{ message: "unifiedReceiveAddress is required when receiveMode is any_chain", path: ["unifiedReceiveAddress"] },
-	)
 	.refine(
 		(data) =>
 			data.receiveMode !== "sui" ||
@@ -44,8 +55,23 @@ export const projectCreateSchema = z
 	)
 	.refine(
 		(data) =>
-			data.receiveMode === "sui" || (data.paymentAddress?.trim().length ?? 0) > 0,
-		{ message: "Payment address is required when receiveMode is base or any_chain", path: ["paymentAddress"] },
+			data.receiveMode !== "starknet" ||
+			((data.starknetAddress?.trim().length ?? 0) > 0 &&
+				/^0x[a-fA-F0-9]{1,64}$/.test(
+					(data.starknetAddress ?? "").trim(),
+				)),
+		{
+			message:
+				"Starknet address (0x + up to 64 hex chars) is required when receiveMode is starknet",
+			path: ["starknetAddress"],
+		},
+	)
+	.refine(
+		(data) =>
+			data.receiveMode === "sui" ||
+			data.receiveMode === "starknet" ||
+			(data.paymentAddress?.trim().length ?? 0) > 0,
+		{ message: "Payment address is required when receiveMode is base", path: ["paymentAddress"] },
 	);
 
 export const projectRotateSchema = z.object({
@@ -59,17 +85,26 @@ export const projectUpdateSchema = z
 		receiveMode: receiveModeSchema.optional(),
 		unifiedReceiveAddress: z.string().min(1).optional(),
 		suiAddress: suiAddressSchema,
+		starknetAddress: starknetAddressSchema,
 	})
-	.refine(
-		(data) =>
-			data.receiveMode !== "any_chain" || (data.unifiedReceiveAddress?.trim().length ?? 0) > 0,
-		{ message: "unifiedReceiveAddress is required when receiveMode is any_chain", path: ["unifiedReceiveAddress"] },
-	)
 	.refine(
 		(data) =>
 			data.receiveMode !== "sui" ||
 			((data.suiAddress?.trim().length ?? 0) > 0 && /^0x[a-fA-F0-9]{64}$/.test((data.suiAddress ?? "").trim())),
 		{ message: "Sui address is required when receiveMode is sui", path: ["suiAddress"] },
+	)
+	.refine(
+		(data) =>
+			data.receiveMode !== "starknet" ||
+			((data.starknetAddress?.trim().length ?? 0) > 0 &&
+				/^0x[a-fA-F0-9]{1,64}$/.test(
+					(data.starknetAddress ?? "").trim(),
+				)),
+		{
+			message:
+				"Starknet address (0x + up to 64 hex chars) is required when receiveMode is starknet",
+			path: ["starknetAddress"],
+		},
 	);
 
 export type ProjectCreateInput = z.infer<typeof projectCreateSchema>;
@@ -129,7 +164,7 @@ export const installVerifySchema = z
 		transactionHash: z.string().min(1).max(132).optional(),
 		transactionDigest: z.string().min(1).max(132).optional(),
 		chainId: z.number().int().positive().optional(),
-		paymentType: z.enum(["evm", "sui"]).optional(),
+		paymentType: z.enum(["evm", "sui", "starknet"]).optional(),
 	})
 	.refine(
 		(data) =>

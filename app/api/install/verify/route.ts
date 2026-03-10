@@ -7,10 +7,13 @@ import {
 	isSupportedChain,
 	priceToSuiAmount,
 	isValidSuiAddress,
+	isValidStarknetAddress,
 } from "@/lib/x402/payment-config";
+import { getStarknetExpectedAmountAtomic } from "@/lib/payments/starknet-requirements";
 import { linkReceiptToEntitlement } from "@/lib/payments/receipt-service";
 import { verifyTransferOnChain } from "@/lib/payments/verify-onchain";
 import { verifySuiTransfer } from "@/lib/payments/verify-sui";
+import { verifyStarknetUsdcTransfer } from "@/lib/payments/verify-starknet";
 import { installVerifySchema } from "@/types/schemas";
 import { parseUnits } from "viem";
 
@@ -40,6 +43,7 @@ export async function POST(request: NextRequest) {
 			paymentType,
 		} = parsed.data;
 		const isSui = paymentType === "sui" && transactionDigest;
+		const isStarknet = paymentType === "starknet" && transactionHash;
 
 		if (isSui) {
 			console.log("[verify] Sui payment verification request", {
@@ -100,6 +104,71 @@ export async function POST(request: NextRequest) {
 			});
 		}
 
+		if (isStarknet) {
+			console.log("[verify] Starknet payment verification request", {
+				sessionToken: sessionToken ? `${sessionToken.slice(0, 8)}...` : null,
+				transactionHash,
+			});
+
+			const attempt = await prisma.installAttempt.findUnique({
+				where: { sessionToken },
+				include: { project: { include: { pricingRules: true } } },
+			});
+
+			if (!attempt) {
+				return NextResponse.json(
+					{ error: "Unknown install session" },
+					{ status: 404 },
+				);
+			}
+
+			const project = attempt.project as {
+				starknetAddress?: string | null;
+				pricingRules: { amount: number }[];
+			};
+			const recipient = project.starknetAddress?.trim();
+			if (!recipient || !isValidStarknetAddress(recipient)) {
+				return NextResponse.json(
+					{ error: "Project does not accept Starknet payments" },
+					{ status: 400 },
+				);
+			}
+
+			const price = project.pricingRules[0]?.amount ?? 0;
+			const expectedAmountUnits = getStarknetExpectedAmountAtomic(price);
+			if (expectedAmountUnits === undefined) {
+				return NextResponse.json(
+					{ error: "Starknet USDC is not configured (set STARKNET_USDC_ADDRESS)" },
+					{ status: 500 },
+				);
+			}
+
+			const result = await verifyStarknetUsdcTransfer(
+				transactionHash,
+				recipient,
+				expectedAmountUnits,
+			);
+
+			if (!result.verified) {
+				console.log("[verify] Starknet verification failed", result.reason);
+				return NextResponse.json(
+					{
+						error: result.reason
+							? `Payment verification failed: ${result.reason}`
+							: "Payment verification failed",
+						verified: false,
+					},
+					{ status: 400 },
+				);
+			}
+
+			await linkReceiptToEntitlement(sessionToken, transactionHash);
+			return NextResponse.json({
+				verified: true,
+				receipt: transactionHash,
+			});
+		}
+
 		const chainId = bodyChainId ?? paymentChainId();
 		if (!transactionHash) {
 			return NextResponse.json(
@@ -143,14 +212,10 @@ export async function POST(request: NextRequest) {
 
 		const project = attempt.project as {
 			receiveMode?: string | null;
-			unifiedReceiveAddress?: string | null;
 			paymentAddress: string;
 			pricingRules: { amount: number }[];
 		};
-		const receiveMode = project.receiveMode ?? "base";
-		const unifiedReceiveAddress = project.unifiedReceiveAddress?.trim();
-		const isAnyChain = receiveMode === "any_chain" && unifiedReceiveAddress;
-		const recipient = isAnyChain ? unifiedReceiveAddress : project.paymentAddress;
+		const recipient = project.paymentAddress;
 
 		const price = project.pricingRules[0]?.amount ?? 0;
 		const expectedAmountUnits = parseUnits(String(price), PAYMENT_TOKEN_DECIMALS);

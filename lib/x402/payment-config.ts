@@ -4,9 +4,6 @@ export const X402_TEST_FACILITATOR_URL = "https://x402.org/facilitator";
 /** Base Sepolia chain ID. */
 export const BASE_SEPOLIA_CHAIN_ID = 84532;
 
-/** Arc testnet chain ID (Circle L1). */
-export const ARC_TESTNET_CHAIN_ID = 5042002;
-
 /** Ethereum Sepolia chain ID. */
 export const ETHEREUM_SEPOLIA_CHAIN_ID = 11155111;
 
@@ -27,7 +24,6 @@ export const HYPEREVM_TESTNET_CHAIN_ID = 998;
 
 export type SupportedChainId =
 	| typeof BASE_SEPOLIA_CHAIN_ID
-	| typeof ARC_TESTNET_CHAIN_ID
 	| typeof ETHEREUM_SEPOLIA_CHAIN_ID
 	| typeof AVALANCHE_FUJI_CHAIN_ID
 	| typeof WORLD_CHAIN_SEPOLIA_CHAIN_ID
@@ -56,8 +52,6 @@ function infuraRpcUrl(networkSlug: string): string {
 }
 
 const BASE_SEPOLIA_RPC_DEFAULT = "https://sepolia.base.org";
-/** Official Arc testnet RPC (prefer over drpc.org which can return "too many errors"). */
-const ARC_TESTNET_RPC_DEFAULT = "https://rpc.testnet.arc.network";
 const ETHEREUM_SEPOLIA_RPC_DEFAULT = "https://rpc.sepolia.org";
 const AVALANCHE_FUJI_RPC_DEFAULTS = [
 	"https://api.avax-test.network/ext/bc/C/rpc",
@@ -75,7 +69,7 @@ const SONIC_TESTNET_RPC_DEFAULTS = [
 const SEI_ATLANTIC_RPC_DEFAULT = "https://evm.atlantic-2.seinetwork.io";
 const HYPEREVM_TESTNET_RPC_DEFAULT = "https://testnet.rpc.hyperlane.xyz";
 
-/** Supported payment chains: all Circle Gateway EVM testnets. */
+/** Supported payment chains (EVM). */
 export const SUPPORTED_CHAINS: ChainConfig[] = [
 	{
 		chainId: ETHEREUM_SEPOLIA_CHAIN_ID,
@@ -130,12 +124,6 @@ export const SUPPORTED_CHAINS: ChainConfig[] = [
 		name: "HyperEVM Testnet",
 		rpcUrl: process.env.HYPEREVM_TESTNET_RPC ?? process.env.NEXT_PUBLIC_HYPEREVM_TESTNET_RPC ?? HYPEREVM_TESTNET_RPC_DEFAULT,
 		usdcAddress: "0x2B3370eE501B4a559b57D449569354196457D8Ab",
-	},
-	{
-		chainId: ARC_TESTNET_CHAIN_ID,
-		name: "Arc",
-		rpcUrl: process.env.ARC_TESTNET_RPC ?? process.env.NEXT_PUBLIC_ARC_TESTNET_RPC ?? ARC_TESTNET_RPC_DEFAULT,
-		usdcAddress: "0x3600000000000000000000000000000000000000",
 	},
 ];
 
@@ -288,6 +276,52 @@ export function isValidSuiAddress(addr: string): boolean {
 	return /^0x[a-fA-F0-9]{64}$/.test(trimmed);
 }
 
+// --- Starknet (non-EVM) payment support ---
+
+export type StarknetNetwork = "sepolia";
+
+const STARKNET_SEPOLIA_RPC_DEFAULT = "https://starknet-sepolia-rpc.publicnode.com";
+
+export function getStarknetNetwork(): StarknetNetwork {
+	return "sepolia";
+}
+
+export function getStarknetRpcUrl(): string {
+	const custom =
+		process.env.STARKNET_RPC_URL ?? process.env.NEXT_PUBLIC_STARKNET_RPC_URL;
+	if (custom && typeof custom === "string" && custom.trim().length > 0) {
+		return custom.trim();
+	}
+	return STARKNET_SEPOLIA_RPC_DEFAULT;
+}
+
+/** Starknet USDC token contract address (0x + up to 64 hex). */
+export function getStarknetUsdcAddress(): string | undefined {
+	const a =
+		process.env.STARKNET_USDC_ADDRESS ??
+		process.env.NEXT_PUBLIC_STARKNET_USDC_ADDRESS;
+	if (!a || typeof a !== "string") return undefined;
+	const trimmed = a.trim();
+	return /^0x[a-fA-F0-9]{1,64}$/.test(trimmed) ? trimmed : undefined;
+}
+
+/** Validate Starknet address (0x + 1..64 hex chars). */
+export function isValidStarknetAddress(addr: string): boolean {
+	if (!addr || typeof addr !== "string") return false;
+	const trimmed = addr.trim();
+	return /^0x[a-fA-F0-9]{1,64}$/.test(trimmed);
+}
+
+const STARKNET_SEPOLIA_EXPLORER_BASE = "https://sepolia.voyager.online";
+
+export function getStarknetSepoliaTxUrl(transactionHash: string): string | null {
+	if (!transactionHash?.trim()) return null;
+	const h = transactionHash.trim().startsWith("0x")
+		? transactionHash.trim()
+		: `0x${transactionHash.trim()}`;
+	return `${STARKNET_SEPOLIA_EXPLORER_BASE}/tx/${h}`;
+}
+
 /** Block explorer base URLs for testnet chains (for transaction links after payment). */
 const BLOCK_EXPLORER_BASE_BY_CHAIN: Record<number, string> = {
 	[ETHEREUM_SEPOLIA_CHAIN_ID]: "https://sepolia.etherscan.io",
@@ -297,7 +331,6 @@ const BLOCK_EXPLORER_BASE_BY_CHAIN: Record<number, string> = {
 	[WORLD_CHAIN_SEPOLIA_CHAIN_ID]: "https://sepolia.worldscan.org",
 	[SEI_ATLANTIC_CHAIN_ID]: "https://seitrace.com",
 	[HYPEREVM_TESTNET_CHAIN_ID]: "https://testnet.purrsec.com",
-	[ARC_TESTNET_CHAIN_ID]: "https://testnet.arcscan.app",
 };
 
 /** EVM: URL to view a transaction on the chain's block explorer (testnet). */

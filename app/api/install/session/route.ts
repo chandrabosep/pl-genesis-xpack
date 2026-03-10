@@ -10,13 +10,16 @@ import {
 	SUI_SYMBOL,
 	isValidSuiAddress,
 	getSuiNetwork,
+	isValidStarknetAddress,
+	getStarknetNetwork,
+	getStarknetUsdcAddress,
 } from "@/lib/x402/payment-config";
 import { parseUnits } from "viem";
 
 /**
  * Get payment details for a session token (from /pay?session=xxx).
  * Public: no apiKey required. Returns price and address so the user can pay and submit tx hash.
- * When project.receiveMode is any_chain, returns paymentOptions (Base + Arc); otherwise single Base option.
+ * Returns a single EVM payment option (USDC) unless Sui-only.
  */
 export async function GET(request: NextRequest) {
 	try {
@@ -38,8 +41,10 @@ export async function GET(request: NextRequest) {
 		});
 		const pricingModel = attempt?.project?.pricingModel as string | undefined;
 		const receiveMode = (attempt?.project?.receiveMode as string | null) ?? "base";
-		const unifiedReceiveAddress = attempt?.project?.unifiedReceiveAddress?.trim() ?? null;
 		const suiAddress = (attempt?.project?.suiAddress as string | null)?.trim() ?? null;
+		const starknetAddress =
+			((attempt?.project as unknown as { starknetAddress?: string | null })
+				?.starknetAddress as string | null)?.trim() ?? null;
 
 		if (!attempt) {
 			return NextResponse.json(
@@ -60,15 +65,19 @@ export async function GET(request: NextRequest) {
 
 		const price = attempt.project.pricingRules[0]?.amount ?? 0;
 		const isSuiOnly = receiveMode === "sui" && suiAddress && isValidSuiAddress(suiAddress);
-		const isAnyChain = receiveMode === "any_chain" && unifiedReceiveAddress;
+		const isStarknetOnly =
+			receiveMode === "starknet" &&
+			starknetAddress &&
+			isValidStarknetAddress(starknetAddress);
 		const address = isSuiOnly
 			? suiAddress
-			: isAnyChain
-				? unifiedReceiveAddress
-				: attempt.project.paymentAddress;
-		const isEthereumAddress = /^0x[a-fA-F0-9]{40}$/.test(address);
+			: isStarknetOnly
+				? starknetAddress
+			: attempt.project.paymentAddress;
+		const isEthereumAddress =
+			!isSuiOnly && !isStarknetOnly && /^0x[a-fA-F0-9]{40}$/.test(address);
 		const amountUnits =
-			!isSuiOnly && isEthereumAddress && price > 0
+			!isSuiOnly && !isStarknetOnly && isEthereumAddress && price > 0
 				? parseUnits(String(price), PAYMENT_TOKEN_DECIMALS)
 				: undefined;
 
@@ -81,27 +90,16 @@ export async function GET(request: NextRequest) {
 		};
 		const paymentOptions: PaymentOption[] = [];
 
-		if (!isSuiOnly && amountUnits != null) {
-			if (isAnyChain) {
-				for (const chain of SUPPORTED_CHAINS) {
-					paymentOptions.push({
-						chainId: chain.chainId,
-						paymentUri: `ethereum:${chain.usdcAddress}@${chain.chainId}/transfer?address=${encodeURIComponent(address)}&uint256=${amountUnits}`,
-						tokenAddress: chain.usdcAddress,
-						chainName: chain.name,
-					});
-				}
-			} else {
-				const chainId = paymentChainId();
-				const config = getChainConfig(chainId) ?? SUPPORTED_CHAINS[0];
-				if (config) {
-					paymentOptions.push({
-						chainId: config.chainId,
-						paymentUri: `ethereum:${config.usdcAddress}@${config.chainId}/transfer?address=${encodeURIComponent(address)}&uint256=${amountUnits}`,
-						tokenAddress: config.usdcAddress,
-						chainName: config.name,
-					});
-				}
+		if (!isSuiOnly && !isStarknetOnly && amountUnits != null) {
+			const chainId = paymentChainId();
+			const config = getChainConfig(chainId) ?? SUPPORTED_CHAINS[0];
+			if (config) {
+				paymentOptions.push({
+					chainId: config.chainId,
+					paymentUri: `ethereum:${config.usdcAddress}@${config.chainId}/transfer?address=${encodeURIComponent(address)}&uint256=${amountUnits}`,
+					tokenAddress: config.usdcAddress,
+					chainName: config.name,
+				});
 			}
 		}
 
@@ -123,22 +121,44 @@ export async function GET(request: NextRequest) {
 			};
 		}
 
+		// Starknet payment option: when receiveMode is starknet and project has a Starknet address
+		let starknetPaymentOption:
+			| {
+					amountUsdc: string;
+					starknetAddress: string;
+					currency: string;
+					network: "sepolia";
+					starknetUsdcAddress?: string;
+			  }
+			| undefined;
+		const starknetUsdc = getStarknetUsdcAddress();
+		if (price > 0 && starknetAddress && isValidStarknetAddress(starknetAddress)) {
+			starknetPaymentOption = {
+				amountUsdc: String(price),
+				starknetAddress,
+				currency: PAYMENT_TOKEN_SYMBOL,
+				network: getStarknetNetwork(),
+				starknetUsdcAddress: starknetUsdc ?? undefined,
+			};
+		}
+
 		return NextResponse.json({
 			sessionToken: attempt.sessionToken,
 			price,
 			address,
 			projectName: attempt.project.name,
-			paymentUri: isSuiOnly ? undefined : firstOption?.paymentUri,
-			chainId: isSuiOnly ? undefined : firstOption?.chainId ?? paymentChainId(),
+			paymentUri: isSuiOnly || isStarknetOnly ? undefined : firstOption?.paymentUri,
+			chainId: isSuiOnly || isStarknetOnly ? undefined : firstOption?.chainId ?? paymentChainId(),
 			currency: isSuiOnly ? SUI_SYMBOL : PAYMENT_TOKEN_SYMBOL,
-			tokenAddress: isSuiOnly ? undefined : firstOption?.tokenAddress,
+			tokenAddress: isSuiOnly || isStarknetOnly ? undefined : firstOption?.tokenAddress,
 			amountUnits: amountUnits?.toString(),
 			pricingModel: pricingModel ?? undefined,
 			githubUsername: attempt.githubUsername ?? undefined,
 			githubUserId: attempt.githubUserId ?? undefined,
-			receiveMode: isSuiOnly ? "sui" : isAnyChain ? "any_chain" : "base",
+			receiveMode: isSuiOnly ? "sui" : isStarknetOnly ? "starknet" : "base",
 			paymentOptions: paymentOptions.length > 0 ? paymentOptions : undefined,
 			suiPaymentOption: isSuiOnly ? suiPaymentOption : suiPaymentOption,
+			starknetPaymentOption: isStarknetOnly ? starknetPaymentOption : starknetPaymentOption,
 		});
 	} catch {
 		return NextResponse.json(

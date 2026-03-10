@@ -8,16 +8,19 @@ import {
 	useSwitchChain,
 	useWaitForTransactionReceipt,
 	useWriteContract,
-	useSignTypedData,
 } from "wagmi";
 import { useAppKit } from "@reown/appkit/react";
-import { AlertCircle, Wallet, Hash, Info } from "lucide-react";
+import { AlertCircle, Wallet, Hash } from "lucide-react";
 import {
-	SUPPORTED_CHAINS,
 	SUI_DECIMALS,
+	PAYMENT_TOKEN_DECIMALS,
 	getBlockExplorerTxUrl,
 	getSuiTestnetTxUrl,
+	getStarknetSepoliaTxUrl,
+	getStarknetRpcUrl,
 } from "@/lib/x402/payment-config";
+import { connect as connectStarknet } from "starknetkit";
+import { cairo, RpcProvider, WalletAccount } from "starknet";
 import { CopyButton } from "@/components/ui/copy-button";
 import { Button } from "@/components/ui/button";
 import {
@@ -27,51 +30,6 @@ import {
 } from "@mysten/dapp-kit";
 import { Transaction } from "@mysten/sui/transactions";
 import "@mysten/dapp-kit/dist/index.css";
-
-/** Circle Gateway Minter on Arc (and other EVM testnets). */
-const GATEWAY_MINTER_ADDRESS =
-	"0x0022222ABE238Cc2C7Bb1f21003F0a260052475B" as const;
-const GATEWAY_MINTER_ABI = [
-	{
-		type: "function" as const,
-		name: "gatewayMint",
-		stateMutability: "nonpayable" as const,
-		inputs: [
-			{ name: "attestationPayload", type: "bytes" },
-			{ name: "signature", type: "bytes" },
-		],
-		outputs: [],
-	},
-] as const;
-
-/** Gateway Wallet: deposit your USDC here to get a Gateway balance. Same address on Base Sepolia and Arc. */
-const GATEWAY_WALLET_ADDRESS =
-	"0x0077777d7EBA4688BDeF3E311b846F25870A19B9" as const;
-const GATEWAY_DEPOSIT_ABI = [
-	{
-		type: "function" as const,
-		name: "deposit",
-		stateMutability: "nonpayable" as const,
-		inputs: [
-			{ name: "token", type: "address" },
-			{ name: "value", type: "uint256" },
-		],
-		outputs: [],
-	},
-] as const;
-
-const ERC20_APPROVE_ABI = [
-	{
-		type: "function" as const,
-		name: "approve",
-		stateMutability: "nonpayable" as const,
-		inputs: [
-			{ name: "spender", type: "address" },
-			{ name: "amount", type: "uint256" },
-		],
-		outputs: [{ type: "bool" }],
-	},
-] as const;
 
 const ERC20_TRANSFER_ABI = [
 	{
@@ -87,21 +45,10 @@ const ERC20_TRANSFER_ABI = [
 ] as const;
 
 /** Explicit gas limits to avoid RPC gas estimation returning null (viem destructure error). */
-const GAS_ERC20_APPROVE = BigInt(50_000);
 const GAS_ERC20_TRANSFER = BigInt(65_000);
-const GAS_GATEWAY_DEPOSIT = BigInt(100_000);
-const GAS_GATEWAY_MINT = BigInt(300_000);
 
 const BASE_SEPOLIA_CHAIN_ID = 84532;
-const ARC_TESTNET_CHAIN_ID = 5042002;
 
-const USDC_BY_CHAIN: Record<number, string> = Object.fromEntries(
-	SUPPORTED_CHAINS.map((c) => [c.chainId, c.usdcAddress]),
-);
-const GATEWAY_DEPOSIT_AMOUNT_USDC = 2;
-const GATEWAY_DEPOSIT_AMOUNT_UNITS = BigInt(
-	GATEWAY_DEPOSIT_AMOUNT_USDC * 1_000_000,
-);
 
 const MAX_ERROR_CHARS = 80;
 
@@ -122,9 +69,6 @@ function shortContractError(message: string | undefined): string {
 		return `${message.slice(0, MAX_ERROR_CHARS - 1)}…`;
 	return message;
 }
-
-const RETRY_HINT =
-	"If it failed the first time, try again. It often succeeds on retry.";
 
 /** True when the wallet user rejected/cancelled the transaction (e.g. MetaMask "Reject"). */
 function isUserRejectedRequestError(err: unknown): boolean {
@@ -159,6 +103,14 @@ type SuiPaymentOption = {
 	network: "mainnet" | "testnet";
 };
 
+type StarknetPaymentOption = {
+	amountUsdc: string;
+	starknetAddress: string;
+	currency: string;
+	network: "sepolia";
+	starknetUsdcAddress?: string;
+};
+
 type ReadyPayload = {
 	price: number;
 	address: string;
@@ -172,9 +124,10 @@ type ReadyPayload = {
 	pricingModel?: string;
 	githubUsername?: string;
 	githubUserId?: string;
-	receiveMode?: "base" | "any_chain" | "sui";
+	receiveMode?: "base" | "sui" | "starknet";
 	paymentOptions?: PaymentOption[];
 	suiPaymentOption?: SuiPaymentOption;
+	starknetPaymentOption?: StarknetPaymentOption;
 };
 
 type SessionState =
@@ -204,52 +157,26 @@ export default function PayPage() {
 	const [githubSaved, setGithubSaved] = useState(false);
 	const [githubSaving, setGithubSaving] = useState(false);
 	const [githubError, setGithubError] = useState<string | null>(null);
-	// Circle Gateway flow: source chain for Gateway balance, then attestation + mint
-	const [gatewaySourceChainId, setGatewaySourceChainId] = useState(
-		BASE_SEPOLIA_CHAIN_ID,
-	);
-
-	// When user selects a chain in "Pay with USDC on", use it as gateway source so Pay with Gateway works for that chain
-	useEffect(() => {
-		if (
-			state.status !== "ready" &&
-			state.status !== "confirming" &&
-			state.status !== "verifying"
-		)
-			return;
-		const chainId = "chainId" in state ? state.chainId : undefined;
-		const options =
-			"paymentOptions" in state ? state.paymentOptions : undefined;
-		if (
-			options?.length &&
-			chainId != null &&
-			SUPPORTED_CHAINS.some((c) => c.chainId === chainId)
-		) {
-			setGatewaySourceChainId(chainId);
-		}
-	}, [state]);
-	const [gatewayError, setGatewayError] = useState<string | null>(null);
-	const [gatewayStep, setGatewayStep] = useState<
-		"idle" | "loading" | "sign" | "request" | "mint"
-	>("idle");
-	const [gatewayDepositDone, setGatewayDepositDone] = useState(false);
-	const [gatewayBalance, setGatewayBalance] = useState<string | null>(null);
-	const [gatewayBalanceLoading, setGatewayBalanceLoading] = useState(false);
 	const [suiVerifyDigest, setSuiVerifyDigest] = useState("");
 	const [suiVerifying, setSuiVerifying] = useState(false);
 	const [suiVerifyError, setSuiVerifyError] = useState<string | null>(null);
+	const [starknetVerifyHash, setStarknetVerifyHash] = useState("");
+	const [starknetVerifying, setStarknetVerifying] = useState(false);
+	const [starknetVerifyError, setStarknetVerifyError] = useState<string | null>(
+		null,
+	);
+	const [starknetAccount, setStarknetAccount] = useState<{
+		execute: (calls: unknown[]) => Promise<{ transaction_hash: string }>;
+	} | null>(null);
+	const [starknetPayPending, setStarknetPayPending] = useState(false);
+	const [starknetPayError, setStarknetPayError] = useState<string | null>(null);
 	const [suiConnectOpen, setSuiConnectOpen] = useState(false);
 	const [suiPayError, setSuiPayError] = useState<string | null>(null);
 	const suiWallet = useCurrentWallet();
 	const { mutateAsync: signAndExecuteSui, isPending: suiSignPending } =
 		useSignAndExecuteTransaction();
-	const gatewayDepositRef = useRef<{
-		phase: "approve" | "deposit";
-		usdcAddress: string;
-		amountUnits: bigint;
-	} | null>(null);
 
-	const { address: walletAddress, isConnected, chain } = useAccount();
+	const { isConnected, chain } = useAccount();
 	const { switchChainAsync } = useSwitchChain();
 	const { open } = useAppKit();
 	const {
@@ -260,7 +187,6 @@ export default function PayPage() {
 		isError: isWriteError,
 		reset: resetWriteContract,
 	} = useWriteContract();
-	const { signTypedDataAsync } = useSignTypedData();
 
 	// Wait for tx to be mined before we call verify (avoids "Transaction not found")
 	const {
@@ -299,64 +225,22 @@ export default function PayPage() {
 		if (!txHash || !payingForSessionRef.current) return;
 		const payload = readyPayloadRef.current;
 		if (!payload) return;
-		setGatewayStep("idle");
 		// Only set confirming if we're still in ready (avoid overwriting verifying/verified)
 		setState((s) =>
 			s.status === "ready" ? { ...payload, status: "confirming" } : s,
 		);
 	}, [txHash]);
 
-	// When any write fails (rejected or reverted), show short error in UI, clear gateway deposit flow, and unblock so user can retry
-	useEffect(() => {
-		if (!isWriteError || !writeError) return;
-		gatewayDepositRef.current = null;
-		const raw =
-			writeError?.message ?? "Transaction failed. You can try again.";
-		setGatewayError(
-			isUserRejectedRequestError(writeError)
-				? "Transaction cancelled. You can try again."
-				: shortContractError(raw),
-		);
-		setGatewayStep("idle");
-	}, [isWriteError, writeError]);
-
-	// When tx was submitted but reverted on-chain (e.g. Arc mint failed), show short error and return to ready so user can retry
+	// When tx was submitted but reverted on-chain, return to ready so user can retry
 	useEffect(() => {
 		if (!isReceiptError || !receiptError || !payingForSessionRef.current)
 			return;
 		const payload = readyPayloadRef.current;
 		payingForSessionRef.current = null;
 		readyPayloadRef.current = null;
-		setGatewayError(
-			shortContractError(
-				receiptError?.message ??
-					"Transaction failed on-chain. You can try again.",
-			),
-		);
-		setGatewayStep("idle");
 		if (payload) setState({ ...payload, status: "ready" });
 		resetWriteContract?.();
 	}, [isReceiptError, receiptError, resetWriteContract]);
-
-	// Gateway deposit flow: after approve confirms, run deposit; after deposit confirms, mark done
-	useEffect(() => {
-		if (!isReceiptSuccess || !txHash || !gatewayDepositRef.current) return;
-		const next = gatewayDepositRef.current;
-		if (next.phase === "approve") {
-			gatewayDepositRef.current = { ...next, phase: "deposit" };
-			writeContract({
-				address: GATEWAY_WALLET_ADDRESS,
-				abi: GATEWAY_DEPOSIT_ABI,
-				functionName: "deposit",
-				args: [next.usdcAddress as `0x${string}`, next.amountUnits],
-				gas: GAS_GATEWAY_DEPOSIT,
-			});
-		} else {
-			gatewayDepositRef.current = null;
-			setGatewayDepositDone(true);
-			setGatewayError(null);
-		}
-	}, [isReceiptSuccess, txHash, writeContract]);
 
 	// Auto-verify only after tx is mined (receipt exists) so our server finds the receipt
 	useEffect(() => {
@@ -367,7 +251,6 @@ export default function PayPage() {
 			!payingForSessionRef.current
 		)
 			return;
-		if (gatewayDepositRef.current) return; // let the deposit effect handle it
 		const sessionToken = payingForSessionRef.current;
 		const payload = readyPayloadRef.current;
 		payingForSessionRef.current = null;
@@ -450,143 +333,17 @@ export default function PayPage() {
 		resetWriteContract,
 	]);
 
-	const handlePayWithGateway = useCallback(async () => {
-		if (state.status !== "ready") return;
-		if (!isConnected || !walletAddress) {
-			open({ view: "Connect" });
-			return;
-		}
-		setGatewayError(null);
-		setGatewayStep("loading");
-		try {
-			// Switch to the selected gateway source chain so the wallet shows the correct network when signing
-			if (chain?.id !== gatewaySourceChainId) {
-				await switchChainAsync({ chainId: gatewaySourceChainId });
-			}
-			const res = await fetch(
-				`/api/circle/gateway/attestation?session=${encodeURIComponent(state.sessionToken)}&depositor=${encodeURIComponent(walletAddress)}&sourceChainId=${gatewaySourceChainId}`,
-			);
-			if (!res.ok) {
-				const data = await res.json().catch(() => ({}));
-				throw new Error(data.error ?? "Failed to get burn intent");
-			}
-			const data = await res.json();
-			const msg = data.message;
-			// Rebuild typed data with bigint for signTypedData
-			const message = {
-				...msg,
-				maxBlockHeight: BigInt(msg.maxBlockHeight),
-				maxFee: BigInt(msg.maxFee),
-				spec: {
-					...msg.spec,
-					value: BigInt(msg.spec.value),
-				},
-			};
-			const typedData = { ...data.typedData, message };
-			setGatewayStep("sign");
-			const signature = await signTypedDataAsync(typedData);
-			setGatewayStep("request");
-			const postRes = await fetch("/api/circle/gateway/attestation", {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({
-					sessionToken: state.sessionToken,
-					burnIntent: data.message,
-					signature,
-				}),
-			});
-			if (!postRes.ok) {
-				const errData = await postRes.json().catch(() => ({}));
-				throw new Error(errData.error ?? "Attestation failed");
-			}
-			const { attestation, signature: sig } = await postRes.json();
-			const attestationHex = attestation.startsWith("0x")
-				? attestation
-				: `0x${attestation}`;
-			const sigHex = sig.startsWith("0x") ? sig : `0x${sig}`;
-			if (chain?.id !== ARC_TESTNET_CHAIN_ID) {
-				await switchChainAsync({ chainId: ARC_TESTNET_CHAIN_ID });
-			}
-			payingForSessionRef.current = state.sessionToken;
-			readyPayloadRef.current = {
-				...state,
-				chainId: ARC_TESTNET_CHAIN_ID,
-			};
-			setGatewayStep("mint");
-			resetWriteContract?.();
-			writeContract({
-				address: GATEWAY_MINTER_ADDRESS,
-				abi: GATEWAY_MINTER_ABI,
-				functionName: "gatewayMint",
-				args: [
-					attestationHex as `0x${string}`,
-					sigHex as `0x${string}`,
-				],
-				gas: GAS_GATEWAY_MINT,
-			});
-		} catch (err) {
-			const raw =
-				err instanceof Error ? err.message : "Gateway payment failed";
-			setGatewayError(shortContractError(raw));
-			setGatewayStep("idle");
-		}
-	}, [
-		state,
-		isConnected,
-		walletAddress,
-		open,
-		gatewaySourceChainId,
-		chain?.id,
-		switchChainAsync,
-		signTypedDataAsync,
-		writeContract,
-		resetWriteContract,
-	]);
-
-	const handleDepositToGateway = useCallback(async () => {
-		if (!isConnected || !walletAddress) return;
-		const usdcAddress = USDC_BY_CHAIN[gatewaySourceChainId];
-		if (!usdcAddress) return;
-		setGatewayError(null);
-		setGatewayDepositDone(false);
-		try {
-			if (chain?.id !== gatewaySourceChainId) {
-				await switchChainAsync({ chainId: gatewaySourceChainId });
-			}
-			gatewayDepositRef.current = {
-				phase: "approve",
-				usdcAddress,
-				amountUnits: GATEWAY_DEPOSIT_AMOUNT_UNITS,
-			};
-			resetWriteContract?.();
-			writeContract({
-				address: usdcAddress as `0x${string}`,
-				abi: ERC20_APPROVE_ABI,
-				functionName: "approve",
-				args: [GATEWAY_WALLET_ADDRESS, GATEWAY_DEPOSIT_AMOUNT_UNITS],
-				gas: GAS_ERC20_APPROVE,
-			});
-		} catch (err) {
-			gatewayDepositRef.current = null;
-			const raw = err instanceof Error ? err.message : "Deposit failed";
-			setGatewayError(shortContractError(raw));
-		}
-	}, [
-		isConnected,
-		walletAddress,
-		chain?.id,
-		gatewaySourceChainId,
-		switchChainAsync,
-		writeContract,
-		resetWriteContract,
-	]);
-
 	const fetchSession = useCallback(
 		async (token: string) => {
 			setState({ status: "loading" });
 			setGithubUsername("");
 			setGithubSaved(false);
 			setGithubError(null);
+			setStarknetVerifyHash("");
+			setStarknetVerifyError(null);
+			setStarknetVerifying(false);
+			setStarknetAccount(null);
+			setStarknetPayError(null);
 			try {
 				const res = await fetch(
 					`/api/install/session?session=${encodeURIComponent(token)}`,
@@ -624,6 +381,7 @@ export default function PayPage() {
 					receiveMode: data.receiveMode,
 					paymentOptions: data.paymentOptions,
 					suiPaymentOption: data.suiPaymentOption,
+					starknetPaymentOption: data.starknetPaymentOption,
 				});
 			} catch {
 				setState({
@@ -766,6 +524,128 @@ export default function PayPage() {
 		await verifySuiWithDigest(digest);
 	};
 
+	const verifyStarknetWithHash = useCallback(
+		async (hash: string) => {
+			if (state.status !== "ready" || !state.starknetPaymentOption) return;
+			setStarknetVerifyError(null);
+			setStarknetVerifying(true);
+			try {
+				const res = await fetch("/api/install/verify", {
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({
+						sessionToken: state.sessionToken,
+						transactionHash: hash,
+						paymentType: "starknet",
+					}),
+				});
+				const data = await res.json().catch(() => ({}));
+				if (res.ok && data.verified) {
+					setState({
+						status: "verified",
+						transactionHash: hash,
+					});
+				} else {
+					setStarknetVerifyError(data.error ?? "Verification failed");
+				}
+			} catch {
+				setStarknetVerifyError("Verification failed");
+			} finally {
+				setStarknetVerifying(false);
+			}
+		},
+		[state],
+	);
+
+	const handleVerifyStarknet = async (
+		e: React.FormEvent<HTMLFormElement>,
+	) => {
+		e.preventDefault();
+		if (state.status !== "ready" || !state.starknetPaymentOption) return;
+		const hash = (
+			e.currentTarget.elements.namedItem(
+				"starknetTransactionHash",
+			) as HTMLInputElement
+		)?.value?.trim();
+		if (!hash) return;
+		await verifyStarknetWithHash(hash);
+	};
+
+	const handlePayWithStarknet = useCallback(async () => {
+		if (state.status !== "ready" || !state.starknetPaymentOption) return;
+		const opt = state.starknetPaymentOption;
+		const usdcAddress = opt.starknetUsdcAddress;
+		if (!usdcAddress) {
+			setStarknetPayError("USDC contract not configured for Starknet. Use manual transfer and verify below.");
+			return;
+		}
+		setStarknetPayError(null);
+		if (!starknetAccount) {
+			setStarknetPayPending(true);
+			try {
+				const { wallet } = await connectStarknet({
+					modalMode: "alwaysAsk",
+					modalTheme: "system",
+				});
+				if (wallet) {
+					const provider = new RpcProvider({
+						nodeUrl: getStarknetRpcUrl(),
+					});
+					const account = await WalletAccount.connect(
+						provider,
+						wallet as Parameters<typeof WalletAccount.connect>[1],
+					);
+					setStarknetAccount({
+						execute: account.execute.bind(account) as (
+							calls: unknown[],
+						) => Promise<{ transaction_hash: string }>,
+					});
+				}
+			} catch (err) {
+				setStarknetPayError(err instanceof Error ? err.message : "Failed to connect Starknet wallet");
+			} finally {
+				setStarknetPayPending(false);
+			}
+			return;
+		}
+		const amountUnits = BigInt(
+			Math.round(parseFloat(opt.amountUsdc) * 10 ** PAYMENT_TOKEN_DECIMALS),
+		);
+		const amountU256 = cairo.uint256(amountUnits);
+		const recipient = opt.starknetAddress.startsWith("0x")
+			? opt.starknetAddress
+			: `0x${opt.starknetAddress}`;
+		const call = {
+			contractAddress: usdcAddress,
+			entrypoint: "transfer",
+			calldata: [
+				recipient,
+				amountU256.low.toString(),
+				amountU256.high.toString(),
+			],
+		};
+		setStarknetPayPending(true);
+		setStarknetPayError(null);
+		try {
+			const result = await starknetAccount.execute([call]);
+			const txHash =
+				(result as { transaction_hash?: string }).transaction_hash ??
+				(result as { transactionHash?: string }).transactionHash;
+			if (txHash) {
+				setStarknetVerifyHash(txHash);
+				await verifyStarknetWithHash(txHash);
+			} else {
+				setStarknetPayError("Transaction submitted but no hash returned");
+			}
+		} catch (err) {
+			const msg = err instanceof Error ? err.message : String(err);
+			const isRejected = /reject|denied|cancel/i.test(msg);
+			setStarknetPayError(isRejected ? "Transaction cancelled" : msg || "Transaction failed");
+		} finally {
+			setStarknetPayPending(false);
+		}
+	}, [state, starknetAccount, verifyStarknetWithHash]);
+
 	if (state.status === "loading") {
 		return (
 			<main className="mx-auto flex min-h-[50vh] max-w-xl flex-col items-center justify-center px-6 py-12">
@@ -807,7 +687,11 @@ export default function PayPage() {
 			state.transactionDigest && state.suiNetwork === "testnet"
 				? getSuiTestnetTxUrl(state.transactionDigest)
 				: null;
-		const txUrl = evmTxUrl ?? suiTxUrl;
+		const starknetTxUrl =
+			state.transactionHash && !state.chainId && !state.transactionDigest
+				? getStarknetSepoliaTxUrl(state.transactionHash)
+				: null;
+		const txUrl = evmTxUrl ?? suiTxUrl ?? starknetTxUrl;
 
 		return (
 			<main className="mx-auto max-w-xl px-6 py-12">
@@ -908,15 +792,14 @@ export default function PayPage() {
 	const subscriptionNeedsGithub = isGithubBasedPricing && !hasGithub;
 
 	const isSuiOnly = state.receiveMode === "sui";
+	const isStarknetOnly = state.receiveMode === "starknet";
 	const networkLabel = isSuiOnly
 		? state.suiPaymentOption?.network === "testnet"
 			? "Sui Testnet"
 			: "Sui"
-		: state.receiveMode === "any_chain"
-			? "Arc (via Gateway)"
-			: state.chainId === ARC_TESTNET_CHAIN_ID
-				? "Arc"
-				: "Base Sepolia";
+		: isStarknetOnly
+			? "Starknet Sepolia"
+			: "Base Sepolia";
 	const amountCopyText =
 		isSuiOnly && state.suiPaymentOption
 			? `${state.suiPaymentOption.amountSui} ${state.suiPaymentOption.currency}`
@@ -954,7 +837,7 @@ export default function PayPage() {
 					)}
 				</header>
 
-				{/* Step indicator: 1 Review → 2 Pay → 3 Verify (direct) or 1 Review → 2 Pay (Gateway) */}
+				{/* Step indicator: 1 Review → 2 Pay → 3 Verify (EVM); Sui uses its own verify UX */}
 				<div
 					className="mb-4 flex items-center justify-center gap-2 rounded-md bg-card px-4 py-2.5 shadow-sm ring-1 ring-border/50"
 					aria-label="Payment steps"
@@ -972,8 +855,7 @@ export default function PayPage() {
 						</span>
 						Pay
 					</span>
-					{state.receiveMode !== "any_chain" &&
-						state.receiveMode !== "sui" && (
+					{state.receiveMode !== "sui" && (
 							<>
 								<span
 									className="h-px w-6 bg-border"
@@ -1113,7 +995,8 @@ export default function PayPage() {
 										writeError,
 									) && (
 										<p className="mt-1 text-xs text-muted-foreground">
-											{RETRY_HINT}
+											If it failed the first time, try again.
+											It often succeeds on retry.
 										</p>
 									)}
 								</div>
@@ -1142,11 +1025,9 @@ export default function PayPage() {
 									className="mt-1.5 -ml-1 rounded-lg"
 								/>
 							</div>
-							{state.receiveMode !== "any_chain" && (
-								<span className="rounded-full bg-muted px-3 py-1.5 text-xs font-medium text-muted-foreground">
-									{networkLabel}
-								</span>
-							)}
+							<span className="rounded-full bg-muted px-3 py-1.5 text-xs font-medium text-muted-foreground">
+								{networkLabel}
+							</span>
 						</div>
 						<div className="mt-4 border-t border-border pt-4">
 							<p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
@@ -1389,213 +1270,146 @@ export default function PayPage() {
 						</section>
 					)}
 
-					{/* Step 2: Circle Gateway */}
-					{state.receiveMode === "any_chain" && (
+					{/* Pay with Starknet (optional) */}
+					{state.starknetPaymentOption && (
 						<section
-							className="rounded-2xl border-2 border-primary/20 bg-primary/5 p-4 shadow-sm"
-							aria-label="Pay with Circle Gateway"
+							className="rounded-2xl border-2 border-purple-500/30 bg-purple-500/5 p-4 shadow-sm"
+							aria-label="Pay with Starknet"
 						>
 							<div className="flex items-center gap-2">
-								<Wallet className="h-5 w-5 text-primary" />
+								<div className="h-5 w-5 shrink-0 rounded-full bg-purple-600" />
 								<h2 className="text-base font-semibold text-foreground">
-									Pay with Circle Gateway
+									Pay with Starknet
+									<span className="ml-1.5 text-xs font-normal text-muted-foreground">
+										(Sepolia)
+									</span>
 								</h2>
 							</div>
 							<p className="mt-1.5 text-sm text-muted-foreground">
-								Payment is received on Arc. Use your unified
-								Gateway balance. Need funds? Use the{" "}
-								<a
-									href="https://faucet.circle.com"
-									target="_blank"
-									rel="noopener noreferrer"
-									className="font-medium text-primary underline underline-offset-2 hover:no-underline"
-								>
-									Circle Faucet
-								</a>{" "}
-								then deposit to Gateway on any supported chain.
+								Send USDC on Starknet Sepolia to the address below,
+								then paste the transaction hash to verify.
 							</p>
-
-							{/* Step 2a: Source chain */}
-							<div className="mt-4">
-								<p className="mb-1.5 text-xs font-medium text-muted-foreground">
-									1. Select chain where you deposited into
-									Gateway
-								</p>
-								<div className="flex flex-wrap gap-2">
-									{SUPPORTED_CHAINS.map((c) => (
-										<Button
-											key={c.chainId}
-											type="button"
-											variant={
-												gatewaySourceChainId ===
-												c.chainId
-													? "default"
-													: "outline"
-											}
-											size="sm"
-											onClick={() =>
-												setGatewaySourceChainId(
-													c.chainId,
-												)
-											}
-											className="rounded-lg"
-										>
-											{c.name}
-										</Button>
-									))}
-								</div>
-							</div>
-
-							{/* Step 2b: Balance + deposit */}
-							<div className="mt-4">
-								<p className="mb-1.5 text-xs font-medium text-muted-foreground">
-									2. Check balance or deposit
-								</p>
-								{gatewayDepositDone && (
-									<p className="mb-2 text-sm text-primary">
-										Deposit complete. Wait 2–5 min for
-										finality, then check balance below.
+							<div className="mt-4 space-y-3">
+								<div>
+									<p className="text-xs font-medium text-muted-foreground">
+										Amount
 									</p>
-								)}
-								{isConnected && walletAddress && (
-									<div className="flex flex-wrap items-center gap-2">
-										<Button
-											type="button"
+									<p className="mt-1 font-semibold tabular-nums text-foreground">
+										{state.starknetPaymentOption.amountUsdc}{" "}
+										{state.starknetPaymentOption.currency}
+									</p>
+									<CopyButton
+										value={`${state.starknetPaymentOption.amountUsdc} ${state.starknetPaymentOption.currency}`}
+										buttonText="Copy"
+										variant="ghost"
+										size="xs"
+										className="mt-1 -ml-1 rounded-lg"
+									/>
+								</div>
+								<div>
+									<p className="text-xs font-medium text-muted-foreground">
+										Starknet receive address
+									</p>
+									<div className="mt-1.5 flex flex-wrap items-center gap-2">
+										<code className="max-w-full break-all rounded-lg bg-muted/60 px-2 py-1.5 font-mono text-sm">
+											{state.starknetPaymentOption.starknetAddress}
+										</code>
+										<CopyButton
+											value={
+												state.starknetPaymentOption.starknetAddress
+											}
+											label="Copy Starknet address"
+											buttonText="Copy"
 											variant="outline"
-											size="sm"
-											onClick={async () => {
-												setGatewayBalanceLoading(true);
-												setGatewayBalance(null);
-												try {
-													const r = await fetch(
-														`/api/circle/gateway/balances?depositor=${encodeURIComponent(walletAddress)}`,
-													);
-													const d = await r.json();
-													if (
-														r.ok &&
-														typeof d.total ===
-															"string"
-													)
-														setGatewayBalance(
-															d.total,
-														);
-													else
-														setGatewayBalance(null);
-												} catch {
-													setGatewayBalance(null);
-												} finally {
-													setGatewayBalanceLoading(
-														false,
-													);
-												}
-											}}
-											disabled={gatewayBalanceLoading}
+											size="xs"
 											className="rounded-lg"
-										>
-											{gatewayBalanceLoading
-												? "Checking…"
-												: "Check Gateway balance"}
-										</Button>
-										{gatewayBalance !== null && (
-											<span className="text-sm text-muted-foreground">
-												Balance:{" "}
-												<strong className="text-foreground">
-													{gatewayBalance} USDC
-												</strong>
-												{parseFloat(gatewayBalance) <
-													0.11 && (
-													<span className="text-amber-600 dark:text-amber-400">
-														{" "}
-														— need ≥0.11 (wait for
-														finality)
-													</span>
-												)}
-											</span>
-										)}
+										/>
 									</div>
-								)}
-								<div className="mt-2 flex flex-wrap items-center gap-2">
+								</div>
+								{/* Pay with Starknet Wallet (connect via StarknetKit, then execute USDC transfer) */}
+								<div className="flex flex-col gap-2">
 									<Button
 										type="button"
-										variant="outline"
-										size="sm"
-										onClick={handleDepositToGateway}
 										disabled={
-											!isConnected ||
-											isWritePending ||
-											!!gatewayDepositRef.current
+											starknetVerifying ||
+											starknetPayPending ||
+											subscriptionNeedsGithub
 										}
-										className="rounded-lg border-purple-500/40 bg-purple-500/15 text-purple-800 hover:text-purple-800 hover:bg-purple-500/25 dark:text-purple-200 dark:hover:bg-purple-500/20"
+										onClick={handlePayWithStarknet}
+										className="w-full rounded-md border-2 border-purple-600 bg-purple-600 py-3 font-semibold text-white hover:bg-purple-700 hover:text-white"
 									>
-										{gatewayDepositRef.current
-											? gatewayDepositRef.current
-													.phase === "approve"
-												? "Confirm approve in wallet…"
-												: "Confirm deposit in wallet…"
-											: `Deposit ${GATEWAY_DEPOSIT_AMOUNT_USDC} USDC to Gateway`}
+										{!starknetAccount
+											? "Connect Starknet Wallet"
+											: starknetPayPending
+												? "Confirm in wallet…"
+												: "Pay with Starknet Wallet"}
 									</Button>
-									<span className="text-xs text-muted-foreground">
-										Wallet → Gateway
-									</span>
-								</div>
-							</div>
-
-							{gatewayError && (
-								<div
-									className="mt-4 max-w-full overflow-hidden space-y-4"
-									role="alert"
-								>
-									<p className="max-w-full text-sm text-destructive">
-										{shortContractError(gatewayError)}
+									{starknetPayError && (
+										<p
+											className="text-center text-sm text-destructive"
+											role="alert"
+										>
+											{starknetPayError}
+										</p>
+									)}
+									<p className="text-center text-xs text-muted-foreground">
+										{!starknetAccount
+											? "Connect your Starknet wallet (Braavos, Argent, etc.) to pay"
+											: "Opens your Starknet wallet to sign and send USDC"}
 									</p>
 								</div>
-							)}
-
-							<div className="mt-6 flex items-center gap-1 bg-yellow-500/30 p-2 rounded-md">
-								<Info className="size-3.5 text-yellow-700" />
-								<p className="max-w-full text-xs font-medium text-yellow-700">
-									{RETRY_HINT}
-								</p>
-							</div>
-
-							{/* Step 2c: Pay CTA */}
-							<div className="mt-4">
-								<p className="mb-1.5 text-xs font-medium text-muted-foreground">
-									3. Pay
-								</p>
-								<Button
-									type="button"
-									onClick={handlePayWithGateway}
-									disabled={
-										subscriptionNeedsGithub ||
-										(isConnected &&
-											(gatewayStep === "loading" ||
-												gatewayStep === "sign" ||
-												gatewayStep === "request" ||
-												isWritePending))
-									}
-									className="w-full rounded-md py-3 font-medium"
-								>
-									{!isConnected
-										? "Connect wallet"
-										: gatewayStep === "loading"
-											? "Loading…"
-											: gatewayStep === "sign"
-												? "Sign in wallet…"
-												: gatewayStep === "request"
-													? "Requesting attestation…"
-													: gatewayStep === "mint" ||
-														  isWritePending
-														? "Confirm mint in wallet…"
-														: "Pay with Gateway"}
-								</Button>
+								<div className="border-t border-border pt-3">
+									<p className="mb-1.5 text-xs font-medium text-muted-foreground">
+										Verify with transaction hash
+									</p>
+									<form
+										onSubmit={handleVerifyStarknet}
+										className="flex flex-col gap-2 sm:flex-row sm:items-end"
+									>
+										<input
+											id="starknetTransactionHash"
+											name="starknetTransactionHash"
+											type="text"
+											value={starknetVerifyHash}
+											onChange={(e) => {
+												setStarknetVerifyHash(
+													e.target.value,
+												);
+												setStarknetVerifyError(null);
+											}}
+											placeholder="Paste 0x… transaction hash from Starknet wallet/explorer"
+											className="min-w-0 flex-1 rounded-md border border-input bg-background px-3.5 py-2.5 font-mono text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+											disabled={starknetVerifying}
+										/>
+										<Button
+											type="submit"
+											disabled={
+												starknetVerifying ||
+												!starknetVerifyHash.trim() ||
+												subscriptionNeedsGithub
+											}
+											className="rounded-md py-2.5 font-medium sm:w-auto sm:min-w-[140px]"
+										>
+											{starknetVerifying
+												? "Verifying…"
+												: "Verify USDC payment"}
+										</Button>
+									</form>
+									{starknetVerifyError && (
+										<p
+											className="mt-2 text-sm text-destructive"
+											role="alert"
+										>
+											{starknetVerifyError}
+										</p>
+									)}
+								</div>
 							</div>
 						</section>
 					)}
 
-					{/* Step 2 (direct): Pay with wallet + Verify in one card (Base only; Sui uses block above) */}
-					{state.receiveMode !== "any_chain" &&
-						state.receiveMode !== "sui" && (
+					{/* Step 2 (direct): Pay with wallet + Verify in one card (Base only; Sui/Starknet use blocks above) */}
+					{state.receiveMode === "base" && (
 							<section
 								className="rounded-2xl border border-border bg-card p-4 shadow-sm"
 								aria-label="Pay and verify"
