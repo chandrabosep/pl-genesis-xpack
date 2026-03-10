@@ -2,11 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma/client";
 import {
 	paymentChainId,
+	FLOW_EVM_TESTNET_CHAIN_ID,
+	FLOW_DECIMALS,
+	FLOW_SYMBOL,
 	PAYMENT_TOKEN_DECIMALS,
 	PAYMENT_TOKEN_SYMBOL,
 	SUPPORTED_CHAINS,
 	getChainConfig,
 	priceToSuiAmount,
+	priceToFlowAmount,
 	SUI_SYMBOL,
 	isValidSuiAddress,
 	getSuiNetwork,
@@ -69,19 +73,20 @@ export async function GET(request: NextRequest) {
 			receiveMode === "starknet" &&
 			starknetAddress &&
 			isValidStarknetAddress(starknetAddress);
+		const isFlowOnly = receiveMode === "flow" && /^0x[a-fA-F0-9]{40}$/.test(attempt.project.paymentAddress?.trim() ?? "");
 		const address = isSuiOnly
 			? suiAddress
 			: isStarknetOnly
 				? starknetAddress
-			: attempt.project.paymentAddress;
+				: attempt.project.paymentAddress;
 		const isEthereumAddress =
-			!isSuiOnly && !isStarknetOnly && /^0x[a-fA-F0-9]{40}$/.test(address);
+			!isSuiOnly && !isStarknetOnly && !isFlowOnly && /^0x[a-fA-F0-9]{40}$/.test(address);
 		const amountUnits =
-			!isSuiOnly && !isStarknetOnly && isEthereumAddress && price > 0
+			!isSuiOnly && !isStarknetOnly && !isFlowOnly && isEthereumAddress && price > 0
 				? parseUnits(String(price), PAYMENT_TOKEN_DECIMALS)
 				: undefined;
 
-		// Build payment option(s) for USDC (only when not Sui-only)
+		// Build payment option(s) for USDC (only when not Sui/Starknet/Flow — Flow uses native FLOW only)
 		type PaymentOption = {
 			chainId: number;
 			paymentUri: string;
@@ -90,7 +95,7 @@ export async function GET(request: NextRequest) {
 		};
 		const paymentOptions: PaymentOption[] = [];
 
-		if (!isSuiOnly && !isStarknetOnly && amountUnits != null) {
+		if (!isSuiOnly && !isStarknetOnly && !isFlowOnly && amountUnits != null) {
 			const chainId = paymentChainId();
 			const config = getChainConfig(chainId) ?? SUPPORTED_CHAINS[0];
 			if (config) {
@@ -104,6 +109,27 @@ export async function GET(request: NextRequest) {
 		}
 
 		const firstOption = paymentOptions[0];
+
+		// Flow EVM Testnet: native FLOW only (no USDC)
+		let flowPaymentOption:
+			| {
+					amountFlow: string;
+					amountFlowWei: string;
+					flowAddress: string;
+					currency: string;
+					chainId: number;
+			  }
+			| undefined;
+		if (isFlowOnly && price > 0 && address) {
+			const amountFlow = priceToFlowAmount(price);
+			flowPaymentOption = {
+				amountFlow,
+				amountFlowWei: parseUnits(amountFlow, FLOW_DECIMALS).toString(),
+				flowAddress: address,
+				currency: FLOW_SYMBOL,
+				chainId: FLOW_EVM_TESTNET_CHAIN_ID,
+			};
+		}
 
 		// Sui payment option: when receiveMode is sui or project has Sui address
 		let suiPaymentOption: {
@@ -147,18 +173,19 @@ export async function GET(request: NextRequest) {
 			price,
 			address,
 			projectName: attempt.project.name,
-			paymentUri: isSuiOnly || isStarknetOnly ? undefined : firstOption?.paymentUri,
-			chainId: isSuiOnly || isStarknetOnly ? undefined : firstOption?.chainId ?? paymentChainId(),
-			currency: isSuiOnly ? SUI_SYMBOL : PAYMENT_TOKEN_SYMBOL,
-			tokenAddress: isSuiOnly || isStarknetOnly ? undefined : firstOption?.tokenAddress,
+			paymentUri: isSuiOnly || isStarknetOnly || isFlowOnly ? undefined : firstOption?.paymentUri,
+			chainId: isSuiOnly || isStarknetOnly ? undefined : isFlowOnly ? FLOW_EVM_TESTNET_CHAIN_ID : (firstOption?.chainId ?? paymentChainId()),
+			currency: isSuiOnly ? SUI_SYMBOL : isFlowOnly ? FLOW_SYMBOL : PAYMENT_TOKEN_SYMBOL,
+			tokenAddress: isSuiOnly || isStarknetOnly || isFlowOnly ? undefined : firstOption?.tokenAddress,
 			amountUnits: amountUnits?.toString(),
 			pricingModel: pricingModel ?? undefined,
 			githubUsername: attempt.githubUsername ?? undefined,
 			githubUserId: attempt.githubUserId ?? undefined,
-			receiveMode: isSuiOnly ? "sui" : isStarknetOnly ? "starknet" : "base",
+			receiveMode: isSuiOnly ? "sui" : isStarknetOnly ? "starknet" : isFlowOnly ? "flow" : "base",
 			paymentOptions: paymentOptions.length > 0 ? paymentOptions : undefined,
 			suiPaymentOption: isSuiOnly ? suiPaymentOption : suiPaymentOption,
 			starknetPaymentOption: isStarknetOnly ? starknetPaymentOption : starknetPaymentOption,
+			flowPaymentOption: isFlowOnly ? flowPaymentOption : undefined,
 		});
 	} catch {
 		return NextResponse.json(

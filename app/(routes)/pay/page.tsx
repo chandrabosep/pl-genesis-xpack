@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import QRCode from "qrcode";
 import {
 	useAccount,
+	useSendTransaction,
 	useSwitchChain,
 	useWaitForTransactionReceipt,
 	useWriteContract,
@@ -14,6 +15,7 @@ import { AlertCircle, Wallet, Hash } from "lucide-react";
 import {
 	SUI_DECIMALS,
 	PAYMENT_TOKEN_DECIMALS,
+	FLOW_EVM_TESTNET_CHAIN_ID,
 	getBlockExplorerTxUrl,
 	getSuiTestnetTxUrl,
 	getStarknetSepoliaTxUrl,
@@ -111,6 +113,14 @@ type StarknetPaymentOption = {
 	starknetUsdcAddress?: string;
 };
 
+type FlowPaymentOption = {
+	amountFlow: string;
+	amountFlowWei: string;
+	flowAddress: string;
+	currency: string;
+	chainId: number;
+};
+
 type ReadyPayload = {
 	price: number;
 	address: string;
@@ -124,10 +134,11 @@ type ReadyPayload = {
 	pricingModel?: string;
 	githubUsername?: string;
 	githubUserId?: string;
-	receiveMode?: "base" | "sui" | "starknet";
+	receiveMode?: "base" | "sui" | "starknet" | "flow";
 	paymentOptions?: PaymentOption[];
 	suiPaymentOption?: SuiPaymentOption;
 	starknetPaymentOption?: StarknetPaymentOption;
+	flowPaymentOption?: FlowPaymentOption;
 };
 
 type SessionState =
@@ -172,6 +183,7 @@ export default function PayPage() {
 	const [starknetPayError, setStarknetPayError] = useState<string | null>(null);
 	const [suiConnectOpen, setSuiConnectOpen] = useState(false);
 	const [suiPayError, setSuiPayError] = useState<string | null>(null);
+	const [flowSendHash, setFlowSendHash] = useState<string | undefined>(undefined);
 	const suiWallet = useCurrentWallet();
 	const { mutateAsync: signAndExecuteSui, isPending: suiSignPending } =
 		useSignAndExecuteTransaction();
@@ -188,13 +200,16 @@ export default function PayPage() {
 		reset: resetWriteContract,
 	} = useWriteContract();
 
-	// Wait for tx to be mined before we call verify (avoids "Transaction not found")
+	const { sendTransactionAsync, isPending: isSendPending } = useSendTransaction();
+
+	// Wait for tx to be mined before we call verify (EVM: writeContract hash or Flow native send hash)
+	const pendingEvmHash = flowSendHash ?? txHash ?? undefined;
 	const {
 		data: receipt,
 		isSuccess: isReceiptSuccess,
 		isError: isReceiptError,
 		error: receiptError,
-	} = useWaitForTransactionReceipt({ hash: txHash ?? undefined });
+	} = useWaitForTransactionReceipt({ hash: pendingEvmHash });
 
 	const paymentUri =
 		state.status === "ready" ||
@@ -238,6 +253,7 @@ export default function PayPage() {
 		const payload = readyPayloadRef.current;
 		payingForSessionRef.current = null;
 		readyPayloadRef.current = null;
+		setFlowSendHash(undefined);
 		if (payload) setState({ ...payload, status: "ready" });
 		resetWriteContract?.();
 	}, [isReceiptError, receiptError, resetWriteContract]);
@@ -247,7 +263,7 @@ export default function PayPage() {
 		if (
 			!isReceiptSuccess ||
 			!receipt ||
-			!txHash ||
+			!pendingEvmHash ||
 			!payingForSessionRef.current
 		)
 			return;
@@ -257,25 +273,28 @@ export default function PayPage() {
 		readyPayloadRef.current = null;
 		if (!payload) return;
 		queueMicrotask(() => setState({ ...payload, status: "verifying" }));
-		const chainId = payload.chainId ?? BASE_SEPOLIA_CHAIN_ID;
+		const chainId = flowSendHash
+			? FLOW_EVM_TESTNET_CHAIN_ID
+			: (payload.chainId ?? BASE_SEPOLIA_CHAIN_ID);
 		fetch("/api/install/verify", {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({
 				sessionToken,
-				transactionHash: txHash,
+				transactionHash: pendingEvmHash,
 				chainId,
 			}),
 		})
 			.then((res) => res.json())
 			.then((result) => {
-				if (result.verified)
+				if (result.verified) {
+					setFlowSendHash(undefined);
 					setState({
 						status: "verified",
-						transactionHash: txHash,
+						transactionHash: pendingEvmHash,
 						chainId,
 					});
-				else
+				} else
 					setState({
 						status: "verify_error",
 						error: result.error ?? "Verification failed",
@@ -287,22 +306,45 @@ export default function PayPage() {
 					error: "Verification failed",
 				}),
 			);
-	}, [isReceiptSuccess, receipt, txHash]);
+	}, [isReceiptSuccess, receipt, pendingEvmHash, flowSendHash]);
 
 	const handlePayWithWallet = useCallback(async () => {
 		if (state.status !== "ready") return;
-		const {
-			address: recipient,
-			sessionToken,
-			tokenAddress,
-			amountUnits,
-		} = state;
-		if (!tokenAddress || !amountUnits) return;
+		const { sessionToken } = state;
 
 		if (!isConnected) {
 			open({ view: "Connect" });
 			return;
 		}
+
+		// Flow EVM Testnet: native FLOW transfer (not USDC)
+		if (state.flowPaymentOption) {
+			const { flowAddress, amountFlowWei, chainId: flowChainId } = state.flowPaymentOption;
+			if (chain?.id !== flowChainId) {
+				try {
+					await switchChainAsync({ chainId: flowChainId });
+				} catch {
+					return;
+				}
+			}
+			payingForSessionRef.current = sessionToken;
+			readyPayloadRef.current = state;
+			setFlowSendHash(undefined);
+			try {
+				const hash = await sendTransactionAsync({
+					to: flowAddress as `0x${string}`,
+					value: BigInt(amountFlowWei),
+				});
+				if (hash) setFlowSendHash(hash);
+			} catch {
+				payingForSessionRef.current = null;
+				readyPayloadRef.current = null;
+			}
+			return;
+		}
+
+		const { address: recipient, tokenAddress, amountUnits } = state;
+		if (!tokenAddress || !amountUnits) return;
 
 		const targetChainId = state.chainId ?? BASE_SEPOLIA_CHAIN_ID;
 		if (chain?.id !== targetChainId) {
@@ -331,6 +373,7 @@ export default function PayPage() {
 		open,
 		writeContract,
 		resetWriteContract,
+		sendTransactionAsync,
 	]);
 
 	const fetchSession = useCallback(
@@ -382,6 +425,7 @@ export default function PayPage() {
 					paymentOptions: data.paymentOptions,
 					suiPaymentOption: data.suiPaymentOption,
 					starknetPaymentOption: data.starknetPaymentOption,
+					flowPaymentOption: data.flowPaymentOption,
 				});
 			} catch {
 				setState({
@@ -793,17 +837,22 @@ export default function PayPage() {
 
 	const isSuiOnly = state.receiveMode === "sui";
 	const isStarknetOnly = state.receiveMode === "starknet";
+	const isFlowOnly = state.receiveMode === "flow";
 	const networkLabel = isSuiOnly
 		? state.suiPaymentOption?.network === "testnet"
 			? "Sui Testnet"
 			: "Sui"
 		: isStarknetOnly
 			? "Starknet Sepolia"
-			: "Base Sepolia";
+			: isFlowOnly
+				? "Flow EVM Testnet"
+				: "Base Sepolia";
 	const amountCopyText =
 		isSuiOnly && state.suiPaymentOption
 			? `${state.suiPaymentOption.amountSui} ${state.suiPaymentOption.currency}`
-			: `${price} ${state.currency ?? "USDC"}`;
+			: isFlowOnly && state.flowPaymentOption
+				? `${state.flowPaymentOption.amountFlow} ${state.flowPaymentOption.currency}`
+				: `${price} ${state.currency ?? "USDC"}`;
 
 	return (
 		<main className="min-h-screen bg-muted/30">
@@ -1408,13 +1457,66 @@ export default function PayPage() {
 						</section>
 					)}
 
-					{/* Step 2 (direct): Pay with wallet + Verify in one card (Base only; Sui/Starknet use blocks above) */}
-					{state.receiveMode === "base" && (
+					{/* Step 2 (direct): Pay with wallet + Verify in one card (Base / Flow EVM; Sui/Starknet use blocks above) */}
+					{(state.receiveMode === "base" || state.receiveMode === "flow") && (
 							<section
 								className="rounded-2xl border border-border bg-card p-4 shadow-sm"
 								aria-label="Pay and verify"
 							>
-								{paymentUri ? (
+								{state.flowPaymentOption ? (
+									<>
+										<div className="flex items-center gap-2">
+											<Wallet className="h-5 w-5 text-primary" />
+											<h2 className="text-base font-semibold text-foreground">
+												Pay with FLOW
+											</h2>
+										</div>
+										<p className="mt-1.5 text-sm text-muted-foreground">
+											Send native FLOW on Flow EVM Testnet to the address below.
+										</p>
+										<div className="mt-4 space-y-3">
+											<div>
+												<p className="text-xs font-medium text-muted-foreground">Amount</p>
+												<p className="mt-1 font-semibold tabular-nums text-foreground">
+													{state.flowPaymentOption.amountFlow} {state.flowPaymentOption.currency}
+												</p>
+											</div>
+											<div>
+												<p className="text-xs font-medium text-muted-foreground">Flow EVM address</p>
+												<div className="mt-1.5 flex flex-wrap items-center gap-2">
+													<code className="max-w-full break-all rounded-lg bg-muted/60 px-2 py-1.5 font-mono text-sm">
+														{state.flowPaymentOption.flowAddress}
+													</code>
+													<CopyButton
+														value={state.flowPaymentOption.flowAddress}
+														label="Copy address"
+														buttonText="Copy"
+														variant="outline"
+														size="xs"
+														className="rounded-lg"
+													/>
+												</div>
+											</div>
+											<Button
+												type="button"
+												onClick={handlePayWithWallet}
+												disabled={isSendPending || subscriptionNeedsGithub}
+												className="w-full py-3 font-medium"
+											>
+												{!isConnected
+													? "Connect wallet"
+													: isSendPending
+														? "Confirm in wallet…"
+														: "Send FLOW"}
+											</Button>
+											<p className="text-xs text-muted-foreground">
+												{!isConnected
+													? `Connect to pay with FLOW on ${networkLabel}.`
+													: "Opens your wallet to send native FLOW."}
+											</p>
+										</div>
+									</>
+								) : paymentUri ? (
 									<>
 										<div className="flex items-center gap-2">
 											<Wallet className="h-5 w-5 text-primary" />

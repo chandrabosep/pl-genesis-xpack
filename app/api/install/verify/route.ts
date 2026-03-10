@@ -2,10 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma/client";
 import {
 	paymentChainId,
+	FLOW_EVM_TESTNET_CHAIN_ID,
+	FLOW_DECIMALS,
 	PAYMENT_TOKEN_DECIMALS,
 	getChainConfig,
 	isSupportedChain,
 	priceToSuiAmount,
+	priceToFlowAmount,
 	isValidSuiAddress,
 	isValidStarknetAddress,
 } from "@/lib/x402/payment-config";
@@ -14,6 +17,7 @@ import { linkReceiptToEntitlement } from "@/lib/payments/receipt-service";
 import { verifyTransferOnChain } from "@/lib/payments/verify-onchain";
 import { verifySuiTransfer } from "@/lib/payments/verify-sui";
 import { verifyStarknetUsdcTransfer } from "@/lib/payments/verify-starknet";
+import { verifyFlowNativeTransfer } from "@/lib/payments/verify-flow-native";
 import { installVerifySchema } from "@/types/schemas";
 import { parseUnits } from "viem";
 
@@ -177,21 +181,6 @@ export async function POST(request: NextRequest) {
 			);
 		}
 
-		if (!isSupportedChain(chainId)) {
-			return NextResponse.json(
-				{ error: `Unsupported chain: ${chainId}` },
-				{ status: 400 }
-			);
-		}
-
-		const config = getChainConfig(chainId);
-		if (!config) {
-			return NextResponse.json(
-				{ error: "Invalid chain configuration" },
-				{ status: 400 }
-			);
-		}
-
 		console.log("[verify] payment verification request", {
 			sessionToken: sessionToken ? `${sessionToken.slice(0, 8)}...` : null,
 			transactionHash,
@@ -216,8 +205,50 @@ export async function POST(request: NextRequest) {
 			pricingRules: { amount: number }[];
 		};
 		const recipient = project.paymentAddress;
-
 		const price = project.pricingRules[0]?.amount ?? 0;
+
+		// Flow EVM Testnet: verify native FLOW transfer (not USDC)
+		if (chainId === FLOW_EVM_TESTNET_CHAIN_ID) {
+			const expectedFlowWei = parseUnits(priceToFlowAmount(price), FLOW_DECIMALS);
+			const result = await verifyFlowNativeTransfer(
+				transactionHash,
+				recipient,
+				expectedFlowWei,
+			);
+			if (!result.verified) {
+				console.log("[verify] Flow native verification failed", result.reason);
+				return NextResponse.json(
+					{
+						error: result.reason
+							? `Payment verification failed: ${result.reason}`
+							: "Payment verification failed",
+						verified: false,
+					},
+					{ status: 400 }
+				);
+			}
+			await linkReceiptToEntitlement(sessionToken, transactionHash);
+			return NextResponse.json({
+				verified: true,
+				receipt: transactionHash,
+			});
+		}
+
+		if (!isSupportedChain(chainId)) {
+			return NextResponse.json(
+				{ error: `Unsupported chain: ${chainId}` },
+				{ status: 400 }
+			);
+		}
+
+		const config = getChainConfig(chainId);
+		if (!config) {
+			return NextResponse.json(
+				{ error: "Invalid chain configuration" },
+				{ status: 400 }
+			);
+		}
+
 		const expectedAmountUnits = parseUnits(String(price), PAYMENT_TOKEN_DECIMALS);
 		const tokenAddress = config.usdcAddress;
 

@@ -22,6 +22,9 @@ export const SEI_ATLANTIC_CHAIN_ID = 1329;
 /** HyperEVM Testnet chain ID. */
 export const HYPEREVM_TESTNET_CHAIN_ID = 998;
 
+/** Flow EVM Testnet chain ID. */
+export const FLOW_EVM_TESTNET_CHAIN_ID = 545;
+
 export type SupportedChainId =
 	| typeof BASE_SEPOLIA_CHAIN_ID
 	| typeof ETHEREUM_SEPOLIA_CHAIN_ID
@@ -29,7 +32,8 @@ export type SupportedChainId =
 	| typeof WORLD_CHAIN_SEPOLIA_CHAIN_ID
 	| typeof SONIC_TESTNET_CHAIN_ID
 	| typeof SEI_ATLANTIC_CHAIN_ID
-	| typeof HYPEREVM_TESTNET_CHAIN_ID;
+	| typeof HYPEREVM_TESTNET_CHAIN_ID
+	| typeof FLOW_EVM_TESTNET_CHAIN_ID;
 
 export interface ChainConfig {
 	chainId: number;
@@ -68,6 +72,7 @@ const SONIC_TESTNET_RPC_DEFAULTS = [
 ];
 const SEI_ATLANTIC_RPC_DEFAULT = "https://evm.atlantic-2.seinetwork.io";
 const HYPEREVM_TESTNET_RPC_DEFAULT = "https://testnet.rpc.hyperlane.xyz";
+const FLOW_EVM_TESTNET_RPC_DEFAULT = "https://testnet.evm.nodes.onflow.org";
 
 /** Supported payment chains (EVM). */
 export const SUPPORTED_CHAINS: ChainConfig[] = [
@@ -124,6 +129,15 @@ export const SUPPORTED_CHAINS: ChainConfig[] = [
 		name: "HyperEVM Testnet",
 		rpcUrl: process.env.HYPEREVM_TESTNET_RPC ?? process.env.NEXT_PUBLIC_HYPEREVM_TESTNET_RPC ?? HYPEREVM_TESTNET_RPC_DEFAULT,
 		usdcAddress: "0x2B3370eE501B4a559b57D449569354196457D8Ab",
+	},
+	{
+		chainId: FLOW_EVM_TESTNET_CHAIN_ID,
+		name: "Flow EVM Testnet",
+		rpcUrl:
+			process.env.FLOW_EVM_TESTNET_RPC ??
+			process.env.NEXT_PUBLIC_FLOW_EVM_TESTNET_RPC ??
+			FLOW_EVM_TESTNET_RPC_DEFAULT,
+		usdcAddress: process.env.NEXT_PUBLIC_FLOW_EVM_USDC_ADDRESS ?? "0xd431955D55a99EF69BEb96BA34718d0f9fBc91b1", // MockUSDC on Flow EVM testnet
 	},
 ];
 
@@ -312,6 +326,31 @@ export function isValidStarknetAddress(addr: string): boolean {
 	return /^0x[a-fA-F0-9]{1,64}$/.test(trimmed);
 }
 
+// --- Flow EVM Testnet: native FLOW (not USDC) ---
+
+/** FLOW native token decimals (18). */
+export const FLOW_DECIMALS = 18;
+
+/** FLOW symbol for display. */
+export const FLOW_SYMBOL = "FLOW";
+
+/**
+ * Amount of FLOW to request for a given USD price (Flow EVM Testnet only).
+ * Uses FLOW_PRICE_USD env (e.g. 0.5) to convert; if unset, uses price as FLOW amount for testing.
+ */
+export function priceToFlowAmount(priceUsd: number): string {
+	const flowPriceUsd =
+		process.env.FLOW_PRICE_USD ?? process.env.NEXT_PUBLIC_FLOW_PRICE_USD;
+	const amount =
+		flowPriceUsd != null &&
+		Number.isFinite(Number(flowPriceUsd)) &&
+		Number(flowPriceUsd) > 0
+			? priceUsd / Number(flowPriceUsd)
+			: priceUsd;
+	const fixed = amount.toFixed(FLOW_DECIMALS);
+	return parseFloat(fixed).toString();
+}
+
 const STARKNET_SEPOLIA_EXPLORER_BASE = "https://sepolia.voyager.online";
 
 export function getStarknetSepoliaTxUrl(transactionHash: string): string | null {
@@ -331,6 +370,7 @@ const BLOCK_EXPLORER_BASE_BY_CHAIN: Record<number, string> = {
 	[WORLD_CHAIN_SEPOLIA_CHAIN_ID]: "https://sepolia.worldscan.org",
 	[SEI_ATLANTIC_CHAIN_ID]: "https://seitrace.com",
 	[HYPEREVM_TESTNET_CHAIN_ID]: "https://testnet.purrsec.com",
+	[FLOW_EVM_TESTNET_CHAIN_ID]: "https://evm-testnet.flowscan.io",
 };
 
 /** EVM: URL to view a transaction on the chain's block explorer (testnet). */
