@@ -222,9 +222,9 @@ export default function LandingPage() {
 						<div className="grid gap-3 w-full max-w-xl">
 							{[
 								{
-									label: "Arc",
-									sub: "(USDC via Circle Gateway)",
-									package: "xpack-arc-gateway",
+									label: "Starknet",
+									sub: "(coming soon)",
+									package: "xpack-starknet",
 								},
 								{
 									label: "Sui payments",

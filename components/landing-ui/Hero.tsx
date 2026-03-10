@@ -182,7 +182,7 @@ function Hero() {
 										Icon: Package,
 									},
 									{
-										text: "Multi-chain & Circle Gateway payouts",
+										text: "Multi-network payouts (EVM, Sui, Starknet)",
 										Icon: Network,
 									},
 									// {

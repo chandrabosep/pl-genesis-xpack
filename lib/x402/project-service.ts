@@ -37,6 +37,7 @@ export async function listProjects(walletAddress: string): Promise<ProjectSummar
 		receiveMode: p.receiveMode ?? null,
 		unifiedReceiveAddress: p.unifiedReceiveAddress ?? null,
 		suiAddress: p.suiAddress ?? null,
+		starknetAddress: (p as { starknetAddress?: string | null }).starknetAddress ?? null,
 	}));
 }
 
@@ -83,6 +84,7 @@ export async function getProjectById(
 		receiveMode: project.receiveMode ?? null,
 		unifiedReceiveAddress: project.unifiedReceiveAddress ?? null,
 		suiAddress: project.suiAddress ?? null,
+		starknetAddress: (project as { starknetAddress?: string | null }).starknetAddress ?? null,
 	};
 }
 
@@ -98,9 +100,9 @@ export async function createProject(
 		update: {},
 	});
 
-	const isSuiOnly = body.receiveMode === "sui";
+	const isNonEvm = body.receiveMode === "sui" || body.receiveMode === "starknet";
 	const paymentAddress =
-		isSuiOnly && !body.paymentAddress?.trim()
+		isNonEvm && !body.paymentAddress?.trim()
 			? "0x0000000000000000000000000000000000000000"
 			: (body.paymentAddress ?? "").trim();
 
@@ -112,8 +114,10 @@ export async function createProject(
 			receiveMode: body.receiveMode ?? "base",
 			unifiedReceiveAddress: body.unifiedReceiveAddress?.trim() || null,
 			suiAddress: body.suiAddress?.trim() || null,
+			// Prisma client types may lag behind schema changes in this repo; cast for compatibility.
+			starknetAddress: (body as { starknetAddress?: string }).starknetAddress?.trim() || null,
 			developerId: developer.id,
-		},
+		} as unknown as Parameters<typeof prisma.project.create>[0]["data"],
 	});
 
 	await prisma.pricingRule.create({
@@ -184,9 +188,10 @@ export async function rotateApiKey(projectId: string, walletAddress: string) {
 
 export type UpdateProjectParams = {
 	paymentAddress?: string;
-	receiveMode?: "base" | "any_chain" | "sui";
+	receiveMode?: "base" | "sui" | "starknet";
 	unifiedReceiveAddress?: string | null;
 	suiAddress?: string | null;
+	starknetAddress?: string | null;
 };
 
 export async function updateProject(
@@ -217,15 +222,17 @@ export async function updateProject(
 		receiveMode?: string;
 		unifiedReceiveAddress?: string | null;
 		suiAddress?: string | null;
+		starknetAddress?: string | null;
 	} = {};
 	if (updates.paymentAddress !== undefined) data.paymentAddress = updates.paymentAddress;
 	if (updates.receiveMode !== undefined) data.receiveMode = updates.receiveMode;
 	if (updates.unifiedReceiveAddress !== undefined) data.unifiedReceiveAddress = updates.unifiedReceiveAddress?.trim() || null;
 	if (updates.suiAddress !== undefined) data.suiAddress = updates.suiAddress?.trim() || null;
+	if (updates.starknetAddress !== undefined) data.starknetAddress = updates.starknetAddress?.trim() || null;
 
 	await prisma.project.update({
 		where: { id: projectId },
-		data,
+		data: data as unknown as Parameters<typeof prisma.project.update>[0]["data"],
 	});
 
 	return { id: projectId, ...data };

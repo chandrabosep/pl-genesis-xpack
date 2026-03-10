@@ -12,4 +12,6 @@ export interface ProjectSummary {
 	unifiedReceiveAddress?: string | null;
 	/** Optional Sui address to receive SUI payments (Sui hackathon / ecosystem). */
 	suiAddress?: string | null;
+	/** Optional Starknet address to receive USDC on Starknet Sepolia. */
+	starknetAddress?: string | null;
 }

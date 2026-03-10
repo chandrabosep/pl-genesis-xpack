@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { PricingModel } from "@/types/constants";
 import { ProjectForm } from "@/components/projects/project-form";
@@ -30,17 +30,17 @@ export function CreatePackageButton({
 	const [price, setPrice] = useState("0.1");
 	const [paymentAddress, setPaymentAddress] = useState("");
 	const [pricingModel, setPricingModel] = useState<PricingModel>("per_device");
-	const [receiveMode, setReceiveMode] = useState<"base" | "any_chain" | "sui">("base");
-	const [unifiedReceiveAddress, setUnifiedReceiveAddress] = useState("");
+	const [receiveMode, setReceiveMode] = useState<"base" | "sui" | "starknet">(
+		"base",
+	);
 	const [suiAddress, setSuiAddress] = useState("");
-
-	// Default payment address to connected wallet when dialog opens
-	useEffect(() => {
-		if (open && walletAddress) {
+	const [starknetAddress, setStarknetAddress] = useState("");
+	const handleOpenChange = (nextOpen: boolean) => {
+		setOpen(nextOpen);
+		if (nextOpen && walletAddress) {
 			setPaymentAddress((prev) => prev || walletAddress);
-			setUnifiedReceiveAddress((prev) => prev || walletAddress);
 		}
-	}, [open, walletAddress]);
+	};
 
 	const createProject = useCreateProjectMutation(walletAddress, {
 		onSuccess: (project) => {
@@ -50,8 +50,8 @@ export function CreatePackageButton({
 			setPaymentAddress("");
 			setPricingModel("per_device");
 			setReceiveMode("base");
-			setUnifiedReceiveAddress("");
 			setSuiAddress("");
+			setStarknetAddress("");
 			onCreated();
 			router.push(`/projects/${project.id}`);
 		},
@@ -73,21 +73,29 @@ export function CreatePackageButton({
 			});
 			return;
 		}
-		const address = receiveMode === "any_chain" ? unifiedReceiveAddress.trim() || paymentAddress : paymentAddress;
+		if (receiveMode === "starknet") {
+			createProject.mutate({
+				name,
+				pricingModel,
+				price: Number(price),
+				receiveMode: "starknet",
+				starknetAddress: starknetAddress.trim(),
+			});
+			return;
+		}
 		createProject.mutate({
 			name,
 			pricingModel,
 			price: Number(price),
-			paymentAddress: address,
+			paymentAddress,
 			receiveMode,
-			unifiedReceiveAddress: receiveMode === "any_chain" ? address : undefined,
 		});
 	};
 
 	const isInline = variant === "inline";
 
 	return (
-		<Dialog open={open} onOpenChange={setOpen}>
+		<Dialog open={open} onOpenChange={handleOpenChange}>
 			{isInline ? (
 				<Button
 					variant="default"
@@ -118,19 +126,19 @@ export function CreatePackageButton({
 					paymentAddress={paymentAddress}
 					pricingModel={pricingModel}
 					receiveMode={receiveMode}
-					unifiedReceiveAddress={unifiedReceiveAddress}
 					suiAddress={suiAddress}
+					starknetAddress={starknetAddress}
 					onNameChange={setName}
 					onPriceChange={setPrice}
 					onPaymentAddressChange={setPaymentAddress}
 					onPricingChange={setPricingModel}
 					onReceiveModeChange={(mode) => {
 						setReceiveMode(mode);
-						if (mode === "any_chain" && !unifiedReceiveAddress) setUnifiedReceiveAddress(paymentAddress);
 						if (mode === "sui") setSuiAddress("");
+						if (mode === "starknet") setStarknetAddress("");
 					}}
-					onUnifiedReceiveAddressChange={setUnifiedReceiveAddress}
 					onSuiAddressChange={setSuiAddress}
+					onStarknetAddressChange={setStarknetAddress}
 					onSubmit={handleSubmit}
 				/>
 				{createProject.isPending ? (

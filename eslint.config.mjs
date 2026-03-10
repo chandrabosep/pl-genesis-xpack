@@ -12,6 +12,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Generated / vendored artifacts:
+    "lib/generated/**",
+    // Published package scaffolding scripts (CommonJS):
+    "config/package/preinstall.js",
   ]),
 ]);
 

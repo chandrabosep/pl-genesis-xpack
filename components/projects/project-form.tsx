@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/select";
 
 const pricingOptions: PricingModel[] = ["per_device", "subscription", "per_user"];
-type ReceiveMode = "base" | "any_chain" | "sui";
+type ReceiveMode = "base" | "sui" | "starknet";
 
 function pricingOptionLabel(model: PricingModel): string {
 	const labels: Record<PricingModel, string> = {
@@ -29,22 +29,22 @@ export function ProjectForm(props: {
 	paymentAddress: string;
 	pricingModel: PricingModel;
 	receiveMode?: ReceiveMode;
-	unifiedReceiveAddress?: string;
 	suiAddress?: string;
+	starknetAddress?: string;
 	onNameChange: (value: string) => void;
 	onPriceChange: (value: string) => void;
 	onPaymentAddressChange: (value: string) => void;
 	onPricingChange: (value: PricingModel) => void;
 	onReceiveModeChange?: (value: ReceiveMode) => void;
-	onUnifiedReceiveAddressChange?: (value: string) => void;
 	onSuiAddressChange?: (value: string) => void;
+	onStarknetAddressChange?: (value: string) => void;
 	onSubmit: (event: React.FormEvent<HTMLFormElement>) => Promise<void>;
 }) {
 	const receiveMode = props.receiveMode ?? "base";
-	const unifiedReceiveAddress = props.unifiedReceiveAddress ?? "";
 	const suiAddress = props.suiAddress ?? "";
-	const isAnyChain = receiveMode === "any_chain";
+	const starknetAddress = props.starknetAddress ?? "";
 	const isSui = receiveMode === "sui";
+	const isStarknet = receiveMode === "starknet";
 
 	return (
 		<form
@@ -94,50 +94,47 @@ export function ProjectForm(props: {
 						<input
 							type="radio"
 							name="receiveMode"
-							checked={receiveMode === "any_chain"}
-							onChange={() => props.onReceiveModeChange?.("any_chain")}
-							className="rounded border-gray-300"
-						/>
-						<span className="text-sm">Any chain (Circle Gateway)</span>
-					</label>
-					<label className="flex items-center gap-2">
-						<input
-							type="radio"
-							name="receiveMode"
 							checked={receiveMode === "sui"}
 							onChange={() => props.onReceiveModeChange?.("sui")}
 							className="rounded border-gray-300"
 						/>
 						<span className="text-sm">Sui</span>
 					</label>
+					<label className="flex items-center gap-2">
+						<input
+							type="radio"
+							name="receiveMode"
+							checked={receiveMode === "starknet"}
+							onChange={() =>
+								props.onReceiveModeChange?.("starknet")
+							}
+							className="rounded border-gray-300"
+						/>
+						<span className="text-sm">Starknet (Sepolia)</span>
+					</label>
 				</div>
 				<p className="text-xs text-muted-foreground">
 					{receiveMode === "base" && "USDC on Base Sepolia to your address below."}
-					{receiveMode === "any_chain" && "USDC on Base or Arc to your address below."}
 					{receiveMode === "sui" && "SUI on Sui to your address below."}
+					{receiveMode === "starknet" &&
+						"USDC on Starknet Sepolia to your address below."}
 				</p>
 			</div>
-			{!isSui && (
+			{receiveMode === "base" && (
 				<div className="flex flex-col gap-1">
 					<label className="text-sm font-medium">
-						{receiveMode === "base" ? "USDC payment address (Base Sepolia)" : "USDC receive address (Circle Gateway)"}
+						USDC payment address (Base Sepolia)
 					</label>
 					<input
 						className="rounded border px-3 py-2 font-mono text-sm"
-						value={receiveMode === "base" ? props.paymentAddress : unifiedReceiveAddress || props.paymentAddress}
+						value={props.paymentAddress}
 						onChange={(event) => {
 							const v = event.target.value;
 							props.onPaymentAddressChange(v);
-							if (isAnyChain) props.onUnifiedReceiveAddressChange?.(v);
 						}}
 						placeholder="0x…"
 						required
 					/>
-					{isAnyChain && (
-						<p className="text-xs text-muted-foreground">
-							Same address receives USDC when users pay on Base Sepolia or Arc.
-						</p>
-					)}
 				</div>
 			)}
 			{isSui && (
@@ -152,6 +149,27 @@ export function ProjectForm(props: {
 					/>
 					<p className="text-xs text-muted-foreground">
 						Users pay in SUI to this address on Sui {getSuiNetwork()}.
+					</p>
+				</div>
+			)}
+			{isStarknet && (
+				<div className="flex flex-col gap-1">
+					<label className="text-sm font-medium">
+						Starknet receive address (Sepolia)
+					</label>
+					<input
+						className="rounded border px-3 py-2 font-mono text-sm"
+						value={starknetAddress}
+						onChange={(event) =>
+							props.onStarknetAddressChange?.(
+								event.target.value,
+							)
+						}
+						placeholder="0x…"
+						required
+					/>
+					<p className="text-xs text-muted-foreground">
+						Users pay USDC to this address on Starknet Sepolia.
 					</p>
 				</div>
 			)}

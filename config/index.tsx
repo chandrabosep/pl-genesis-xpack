@@ -38,7 +38,7 @@ const baseSepoliaRpc =
 	(infuraProjectId ? `https://base-sepolia.infura.io/v3/${infuraProjectId}` : undefined) ??
 	"https://sepolia.base.org";
 
-// Circle Gateway–supported testnets (must be in wagmi config for switchChain)
+// Supported EVM testnets (must be in wagmi config for switchChain)
 const ethereumSepolia = customChain(
 	11155111,
 	"Ethereum Sepolia",
@@ -106,23 +106,6 @@ const baseSepolia = customChain(
 	baseSepoliaRpc,
 	"https://sepolia.basescan.org",
 );
-// Arc testnet: official RPC first, then fallbacks (avoids "too many errors" from a single endpoint)
-const arcTestnetPublicFallbacks = [
-	"https://rpc.testnet.arc.network",
-	"https://arc-testnet.drpc.org",
-	"https://rpc.drpc.testnet.arc.network",
-	"https://rpc.blockdaemon.testnet.arc.network",
-];
-const arcTestnetRpcUrls = process.env.NEXT_PUBLIC_ARC_TESTNET_RPC
-	? process.env.NEXT_PUBLIC_ARC_TESTNET_RPC.split(",").map((u) => u.trim()).filter(Boolean)
-	: arcTestnetPublicFallbacks;
-const arcTestnet = customChain(
-	5042002,
-	"Arc",
-	arcTestnetRpcUrls.length > 0 ? arcTestnetRpcUrls : arcTestnetPublicFallbacks,
-	"https://testnet.arcscan.app",
-	{ name: "USDC", symbol: "USDC", decimals: 6 },
-);
 
 // Get projectId from https://dashboard.reown.com
 export const projectId = process.env.NEXT_PUBLIC_PROJECT_ID || "";
@@ -140,7 +123,6 @@ export const networks: [AppKitNetwork, ...AppKitNetwork[]] = [
 	worldChainSepolia,
 	seiAtlantic,
 	hyperevmTestnet,
-	arcTestnet,
 ];
 
 //Set up the Wagmi Adapter (Config)

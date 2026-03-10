@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useWalletAddress } from "@/lib/auth/use-wallet-address";
@@ -93,12 +93,8 @@ export function ProjectDetailPage({
 	);
 
 	// When appHost is empty (e.g. local dev), use current origin for xpack host
-	const [effectiveHost, setEffectiveHost] = useState(appHost);
-	useEffect(() => {
-		if (appHost) return;
-		if (typeof window !== "undefined")
-			setEffectiveHost(window.location.origin);
-	}, [appHost]);
+	const effectiveHost =
+		appHost || (typeof window !== "undefined" ? window.location.origin : "");
 
 	const handleUpdatePaymentAddress = (address: string) => {
 		if (!id || !walletAddress || !address.trim()) return;
@@ -121,10 +117,7 @@ export function ProjectDetailPage({
 		deleteMutation.mutate(id);
 	};
 
-	// Sync displayed error with query error
-	useEffect(() => {
-		if (queryError?.message) setError(queryError.message);
-	}, [queryError]);
+	const displayedError = error ?? queryError?.message ?? null;
 
 	if (!walletAddress) {
 		return (
@@ -186,12 +179,12 @@ export function ProjectDetailPage({
 					}}
 				/>
 
-				{error ? (
+				{displayedError ? (
 					<div
 						role="alert"
 						className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive"
 					>
-						{error}
+						{displayedError}
 					</div>
 				) : null}
 

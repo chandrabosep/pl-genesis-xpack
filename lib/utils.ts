@@ -16,13 +16,13 @@ export function pricingModelLabel(model: PricingModel): string {
 	return labels[model] ?? model;
 }
 
-/** Human-readable label for payment type (where payments are received: Base, Arc, or Sui). */
+/** Human-readable label for payment type (where payments are received: Base, Sui, Starknet). */
 export function paymentTypeLabel(receiveMode: string | null | undefined): string {
 	const mode = receiveMode ?? "base";
 	const labels: Record<string, string> = {
 		base: "Base",
-		any_chain: "Arc",
 		sui: "Sui",
+		starknet: "Starknet",
 	};
 	return labels[mode] ?? mode;
 }

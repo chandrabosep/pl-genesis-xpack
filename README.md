@@ -3,7 +3,7 @@
 <img width="1471" alt="image" src="./public/1.jpg">
 
 ##
-**Xpack** is a crypto-native monetization platform for npm packages, built to let developers turn their open-source code into a global business. Authors connect a wallet, add a small configuration and preinstall script to their package, and receive on-chain payments directly to their wallet—no custom backends, payment processors, or bank accounts required. Users pay with **USDC** on supported EVM chains or **native SUI** on the Sui network at install time; once payment is confirmed, the installation continues automatically. Xpack bridges traditional package distribution with on-chain payments and gives authors a unified dashboard to manage pricing, track revenue and installs, and accept cross-chain payments via **Circle's Gateway** without handling bridge complexity.
+**Xpack** is a crypto-native monetization platform for npm packages, built to let developers turn their open-source code into a global business. Authors connect a wallet, add a small configuration and preinstall script to their package, and receive on-chain payments directly to their wallet—no custom backends, payment processors, or bank accounts required. Users pay with **USDC** on supported EVM chains or **native SUI** on the Sui network at install time; once payment is confirmed, the installation continues automatically. Xpack bridges traditional package distribution with on-chain payments and gives authors a unified dashboard to manage pricing, track revenue and installs, and accept multi-network payments (EVM, Sui, Starknet).
 
 ## Features
 
@@ -13,7 +13,7 @@
 
 - **Flexible pricing models**: Support per-device, per-user, or subscription licensing from one dashboard. Set your own pricing and update it anytime.
 
-- **Cross-chain without the hassle**: Accept USDC on EVM chains and native SUI on Sui. Circle’s Gateway handles cross-chain flows so you don’t manage bridges or multiple integrations.
+- **Multi-network payments**: Accept USDC on EVM chains, native SUI on Sui, and expand to Starknet-based flows.
 
 - **Real-time dashboard**: View revenue, installs, and payment status in one place. Track performance and manage your monetized packages from a single interface.
 
@@ -22,7 +22,7 @@
 
 | Package                           | Description                |
 | --------------------------------- | -------------------------- |
-| **Arc (USDC via Circle Gateway)** | `npm i xpack-arc-gateway`  |
+| **Starknet**                      | `npm i xpack-starknet`     |
 | **Sui payments**                  | `npm i xpack-sui`          |
 | **Per-device pricing**            | `npm i xpack-per-device`   |
 | **Per-user pricing**              | `npm i xpack-per-user`     |

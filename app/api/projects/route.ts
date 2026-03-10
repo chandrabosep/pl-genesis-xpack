@@ -48,7 +48,8 @@ export async function PATCH(request: NextRequest) {
       body.paymentAddress != null ||
       body.receiveMode != null ||
       body.unifiedReceiveAddress !== undefined ||
-      body.suiAddress !== undefined;
+      body.suiAddress !== undefined ||
+      body.starknetAddress !== undefined;
     if (hasUpdate) {
       const parsed = projectUpdateSchema.parse(body);
       const updates: Parameters<typeof updateProject>[1] = {};
@@ -58,6 +59,9 @@ export async function PATCH(request: NextRequest) {
         updates.unifiedReceiveAddress = parsed.unifiedReceiveAddress?.trim() || null;
       if (parsed.suiAddress !== undefined)
         updates.suiAddress = parsed.suiAddress?.trim() || null;
+      if ((parsed as { starknetAddress?: string }).starknetAddress !== undefined)
+        updates.starknetAddress =
+          (parsed as { starknetAddress?: string }).starknetAddress?.trim() || null;
       const result = await updateProject(parsed.projectId, updates, walletAddress);
       return NextResponse.json(result);
     }

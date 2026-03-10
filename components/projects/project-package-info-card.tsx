@@ -216,28 +216,45 @@ export function ProjectPackageInfoCard({
 					) : (
 						<div className="flex flex-wrap items-center gap-2">
 							<code className="break-all font-mono text-sm text-foreground">
-								{project.paymentAddress}
+								{project.receiveMode === "starknet"
+									? project.starknetAddress ??
+										"(missing Starknet address)"
+									: project.receiveMode === "sui"
+										? project.suiAddress ??
+											"(missing Sui address)"
+										: project.paymentAddress}
 							</code>
 							<CopyButton
-								value={project.paymentAddress}
+								value={
+									project.receiveMode === "starknet"
+										? project.starknetAddress ??
+											project.paymentAddress
+										: project.receiveMode === "sui"
+											? project.suiAddress ??
+												project.paymentAddress
+											: project.paymentAddress
+								}
 								label="Copy payment address"
 								buttonText="Copy"
 								size="xs"
 								variant="ghost"
 							/>
-							<Button
-								variant="ghost"
-								size="icon"
-								className="size-8 shrink-0"
-								aria-label="Edit payment address"
-								onClick={() =>
-									onStartEditPaymentAddress(
-										project.paymentAddress,
-									)
-								}
-							>
-								<Pencil className="size-3.5" />
-							</Button>
+							{project.receiveMode !== "sui" &&
+								project.receiveMode !== "starknet" && (
+									<Button
+										variant="ghost"
+										size="icon"
+										className="size-8 shrink-0"
+										aria-label="Edit payment address"
+										onClick={() =>
+											onStartEditPaymentAddress(
+												project.paymentAddress,
+											)
+										}
+									>
+										<Pencil className="size-3.5" />
+									</Button>
+								)}
 						</div>
 					)}
 				</DocRow>

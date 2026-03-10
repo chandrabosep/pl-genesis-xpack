@@ -25,9 +25,10 @@ model Project {
   name                   String // Project name (provided by user)
   pricingModel          String // Pricing model chosen
   paymentAddress        String // Payment receiving address (used when receiveMode is base)
-  receiveMode           String?  @default("base") // "base" = Base only; "any_chain" = accept USDC on Base + Arc, receive at unifiedReceiveAddress
-  unifiedReceiveAddress String? // When receiveMode is any_chain: address that receives funds on any chain
+  receiveMode           String?  @default("base") // "base" = USDC on EVM; "sui" = native SUI; "starknet" = USDC on Starknet Sepolia
+  unifiedReceiveAddress String? // legacy (unused): formerly used for Circle Gateway "any_chain" mode
   suiAddress            String? // Optional: receive SUI payments at this Sui address (for Sui hackathon / ecosystem)
+  starknetAddress       String? // Optional: receive USDC on Starknet Sepolia at this Starknet address
   developer              Developer        @relation(fields: [developerId], references: [id])
   developerId            String
   pricingRules    PricingRule[] // Project's pricing rules
