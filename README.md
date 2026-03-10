@@ -13,7 +13,7 @@
 
 - **Flexible pricing models**: Support per-device, per-user, or subscription licensing from one dashboard. Set your own pricing and update it anytime.
 
-- **Multi-network payments**: Accept USDC on EVM chains, native SUI on Sui, and expand to Starknet-based flows.
+- **Multi-network payments**: Accept USDC on EVM chains (Base Sepolia, Ethereum Sepolia, Avalanche Fuji, Flow EVM Testnet, and more), native SUI on Sui, and Starknet.
 
 - **Real-time dashboard**: View revenue, installs, and payment status in one place. Track performance and manage your monetized packages from a single interface.
 
