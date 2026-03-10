@@ -188,7 +188,7 @@ export async function rotateApiKey(projectId: string, walletAddress: string) {
 
 export type UpdateProjectParams = {
 	paymentAddress?: string;
-	receiveMode?: "base" | "sui" | "starknet";
+	receiveMode?: "base" | "sui" | "starknet" | "flow";
 	unifiedReceiveAddress?: string | null;
 	suiAddress?: string | null;
 	starknetAddress?: string | null;

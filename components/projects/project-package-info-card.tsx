@@ -263,12 +263,14 @@ export function ProjectPackageInfoCard({
 					label={
 						project.receiveMode === "sui"
 							? "Price (SUI)"
-							: "Price (USDC)"
+							: project.receiveMode === "flow"
+								? "Price (FLOW)"
+								: "Price (USDC)"
 					}
 				>
 					<p className="font-medium text-foreground">
 						{project.price != null
-							? `${project.price} ${project.receiveMode === "sui" ? "SUI" : "USDC"}`
+							? `${project.price} ${project.receiveMode === "sui" ? "SUI" : project.receiveMode === "flow" ? "FLOW" : "USDC"}`
 							: "—"}
 					</p>
 				</DocRow>

@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/select";
 
 const pricingOptions: PricingModel[] = ["per_device", "subscription", "per_user"];
-type ReceiveMode = "base" | "sui" | "starknet";
+type ReceiveMode = "base" | "sui" | "starknet" | "flow";
 
 function pricingOptionLabel(model: PricingModel): string {
 	const labels: Record<PricingModel, string> = {
@@ -112,18 +112,32 @@ export function ProjectForm(props: {
 						/>
 						<span className="text-sm">Starknet (Sepolia)</span>
 					</label>
+					<label className="flex items-center gap-2">
+						<input
+							type="radio"
+							name="receiveMode"
+							checked={receiveMode === "flow"}
+							onChange={() => props.onReceiveModeChange?.("flow")}
+							className="rounded border-gray-300"
+						/>
+						<span className="text-sm">Flow EVM (Testnet)</span>
+					</label>
 				</div>
 				<p className="text-xs text-muted-foreground">
 					{receiveMode === "base" && "USDC on Base Sepolia to your address below."}
 					{receiveMode === "sui" && "SUI on Sui to your address below."}
 					{receiveMode === "starknet" &&
 						"USDC on Starknet Sepolia to your address below."}
+					{receiveMode === "flow" &&
+						"Native FLOW on Flow EVM Testnet to your address below."}
 				</p>
 			</div>
-			{receiveMode === "base" && (
+			{(receiveMode === "base" || receiveMode === "flow") && (
 				<div className="flex flex-col gap-1">
 					<label className="text-sm font-medium">
-						USDC payment address (Base Sepolia)
+						{receiveMode === "base"
+							? "USDC payment address (Base Sepolia)"
+							: "FLOW receive address (Flow EVM Testnet)"}
 					</label>
 					<input
 						className="rounded border px-3 py-2 font-mono text-sm"

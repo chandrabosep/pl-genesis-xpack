@@ -32,7 +32,7 @@ export function DashboardPackageRow({
 				</td>
 				<td className="px-4 py-3 text-gray-900">
 					{project.price ?? 0}{" "}
-					{project.receiveMode === "sui" ? "SUI" : "USDC"}
+					{project.receiveMode === "sui" ? "SUI" : project.receiveMode === "flow" ? "FLOW" : "USDC"}
 				</td>
 				<td className="px-4 py-3">
 					<span className="inline-flex items-center rounded-full border border-purple-200/50 bg-purple-50 px-2.5 py-0.5 text-xs font-medium text-purple-700">

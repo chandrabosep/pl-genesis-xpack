@@ -7,7 +7,7 @@ const pricingModelSchema = z.enum([
 	"per_user",
 ] as const satisfies readonly PricingModel[]);
 
-export const receiveModeSchema = z.enum(["base", "sui", "starknet"]);
+export const receiveModeSchema = z.enum(["base", "sui", "starknet", "flow"]);
 
 const suiAddressSchema = z
 	.string()
@@ -71,7 +71,7 @@ export const projectCreateSchema = z
 			data.receiveMode === "sui" ||
 			data.receiveMode === "starknet" ||
 			(data.paymentAddress?.trim().length ?? 0) > 0,
-		{ message: "Payment address is required when receiveMode is base", path: ["paymentAddress"] },
+		{ message: "Payment address is required when receiveMode is base or flow", path: ["paymentAddress"] },
 	);
 
 export const projectRotateSchema = z.object({

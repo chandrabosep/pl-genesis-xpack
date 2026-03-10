@@ -30,7 +30,7 @@ export function CreatePackageButton({
 	const [price, setPrice] = useState("0.1");
 	const [paymentAddress, setPaymentAddress] = useState("");
 	const [pricingModel, setPricingModel] = useState<PricingModel>("per_device");
-	const [receiveMode, setReceiveMode] = useState<"base" | "sui" | "starknet">(
+	const [receiveMode, setReceiveMode] = useState<"base" | "sui" | "starknet" | "flow">(
 		"base",
 	);
 	const [suiAddress, setSuiAddress] = useState("");
@@ -80,6 +80,16 @@ export function CreatePackageButton({
 				price: Number(price),
 				receiveMode: "starknet",
 				starknetAddress: starknetAddress.trim(),
+			});
+			return;
+		}
+		if (receiveMode === "flow") {
+			createProject.mutate({
+				name,
+				pricingModel,
+				price: Number(price),
+				receiveMode: "flow",
+				paymentAddress: paymentAddress.trim(),
 			});
 			return;
 		}
@@ -136,6 +146,7 @@ export function CreatePackageButton({
 						setReceiveMode(mode);
 						if (mode === "sui") setSuiAddress("");
 						if (mode === "starknet") setStarknetAddress("");
+						if (mode === "flow") setPaymentAddress((prev) => prev || walletAddress);
 					}}
 					onSuiAddressChange={setSuiAddress}
 					onStarknetAddressChange={setStarknetAddress}

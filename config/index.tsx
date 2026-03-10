@@ -99,6 +99,13 @@ const hyperevmTestnet = customChain(
 	process.env.NEXT_PUBLIC_HYPEREVM_TESTNET_RPC ?? "https://testnet.rpc.hyperlane.xyz",
 	"https://testnet.purrsec.com",
 );
+const flowEvmTestnet = customChain(
+	545,
+	"Flow EVM Testnet",
+	process.env.NEXT_PUBLIC_FLOW_EVM_TESTNET_RPC ?? "https://testnet.evm.nodes.onflow.org",
+	"https://evm-testnet.flowscan.io",
+	{ name: "Flow", symbol: "FLOW", decimals: 18 },
+);
 // Base Sepolia: use Infura when NEXT_PUBLIC_INFURA_PROJECT_ID is set
 const baseSepolia = customChain(
 	84532,
@@ -123,6 +130,7 @@ export const networks: [AppKitNetwork, ...AppKitNetwork[]] = [
 	worldChainSepolia,
 	seiAtlantic,
 	hyperevmTestnet,
+	flowEvmTestnet,
 ];
 
 //Set up the Wagmi Adapter (Config)

@@ -125,7 +125,7 @@ export function DashboardPackageCard({
 						</span>{" "}
 						{pricingModelLabel(project.pricingModel)} ·{" "}
 						{project.price ?? 0}{" "}
-						{project.receiveMode === "sui" ? "SUI" : "USDC"}
+						{project.receiveMode === "sui" ? "SUI" : project.receiveMode === "flow" ? "FLOW" : "USDC"}
 					</div>
 				)}
 				{!embedded && (
@@ -141,7 +141,7 @@ export function DashboardPackageCard({
 								Price:
 							</span>{" "}
 							{project.price ?? 0}{" "}
-							{project.receiveMode === "sui" ? "SUI" : "USDC"}
+							{project.receiveMode === "sui" ? "SUI" : project.receiveMode === "flow" ? "FLOW" : "USDC"}
 						</div>
 						<div className="text-xs text-muted-foreground">
 							<span className="font-medium text-foreground">
