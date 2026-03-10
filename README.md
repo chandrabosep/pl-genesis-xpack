@@ -46,5 +46,4 @@ Meet the team behind Xpack:
 - **Chandra Bose:** Full Stack  Developer / [Twitter](https://x.com/Chandra_Bose31)
 - **Shivathmika** Full Stack Developer  / [Twitter](https://x.com/_shivathmika)
 - **Chetana:** Product Manager / [Twitter](https://x.com/fixerpabo_13)
-- **Rahul:** Product Manager / [Twitter](https://x.com/rahulinweb)
 
