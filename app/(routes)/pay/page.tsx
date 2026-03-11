@@ -2,7 +2,6 @@
 
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
-import QRCode from "qrcode";
 import {
 	useAccount,
 	useSendTransaction,
@@ -160,7 +159,6 @@ export default function PayPage() {
 	const searchParams = useSearchParams();
 	const sessionParam = searchParams.get("session");
 	const [state, setState] = useState<SessionState>({ status: "loading" });
-	const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
 	const payingForSessionRef = useRef<string | null>(null);
 	const readyPayloadRef = useRef<ReadyPayload | null>(null);
 	// For subscription: GitHub username when missing from session (user enters on pay page)
@@ -217,24 +215,6 @@ export default function PayPage() {
 		state.status === "verifying"
 			? state.paymentUri
 			: undefined;
-	useEffect(() => {
-		if (!paymentUri) {
-			queueMicrotask(() => setQrDataUrl(null));
-			return;
-		}
-		let cancelled = false;
-		QRCode.toDataURL(paymentUri, { width: 256, margin: 2 })
-			.then((url) => {
-				if (!cancelled) setQrDataUrl(url);
-			})
-			.catch(() => {
-				if (!cancelled) setQrDataUrl(null);
-			});
-		return () => {
-			cancelled = true;
-		};
-	}, [paymentUri]);
-
 	// When tx is submitted, show "Confirming…" (waiting for block)
 	useEffect(() => {
 		if (!txHash || !payingForSessionRef.current) return;
@@ -854,11 +834,19 @@ export default function PayPage() {
 				? `${state.flowPaymentOption.amountFlow} ${state.flowPaymentOption.currency}`
 				: `${price} ${state.currency ?? "USDC"}`;
 
+	const payThemeClass = isStarknetOnly
+		? "starknet-pay"
+		: isSuiOnly
+			? "sui-pay"
+			: isFlowOnly
+				? "flow-pay"
+				: "base-pay";
+
 	return (
-		<main className="min-h-screen bg-muted/30">
-			<div className="mx-auto max-w-xl px-4 py-4 sm:px-6 sm:py-6">
+		<main className={`${payThemeClass} min-h-screen bg-background`}>
+			<div className="mx-auto max-w-xl	">
 				{/* Header */}
-				<header className="mb-4">
+				<header className="mb-6">
 					<h1 className="text-2xl font-semibold tracking-tight text-foreground">
 						Complete payment
 					</h1>
@@ -888,7 +876,7 @@ export default function PayPage() {
 
 				{/* Step indicator: 1 Review → 2 Pay → 3 Verify (EVM); Sui uses its own verify UX */}
 				<div
-					className="mb-4 flex items-center justify-center gap-2 rounded-md bg-card px-4 py-2.5 shadow-sm ring-1 ring-border/50"
+					className="mb-6 flex items-center justify-center gap-3 rounded-xl bg-card px-4 py-3 shadow-sm ring-1 ring-border/60"
 					aria-label="Payment steps"
 				>
 					<span className="flex items-center gap-1.5 text-sm font-medium text-foreground">
@@ -904,23 +892,16 @@ export default function PayPage() {
 						</span>
 						Pay
 					</span>
-					{state.receiveMode !== "sui" && (
-							<>
-								<span
-									className="h-px w-6 bg-border"
-									aria-hidden
-								/>
-								<span className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
-									<span className="flex h-6 w-6 items-center justify-center rounded-full bg-muted text-xs">
-										3
-									</span>
-									Verify
-								</span>
-							</>
-						)}
+					<span className="h-px w-6 bg-border" aria-hidden />
+					<span className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
+						<span className="flex h-6 w-6 items-center justify-center rounded-full bg-muted text-xs">
+							3
+						</span>
+						Verify
+					</span>
 				</div>
 
-				<div className="space-y-4">
+				<div className="space-y-5">
 					{/* GitHub (subscription / per_user) — Step 0 */}
 					{subscriptionNeedsGithub && (
 						<section className="rounded-2xl border border-amber-500/30 bg-amber-500/5 p-4 shadow-sm">
@@ -1019,7 +1000,7 @@ export default function PayPage() {
 										: "Payment failed"}
 								</p>
 								<div
-									className={`mt-1 max-w-full overflow-hidden break-words text-sm ${
+									className={`mt-1 max-w-full overflow-hidden wrap-break-word text-sm ${
 										isUserRejectedRequestError(writeError)
 											? "text-muted-foreground"
 											: "text-destructive/90"
@@ -1098,14 +1079,14 @@ export default function PayPage() {
 						</div>
 					</section>
 
-					{/* Pay with SUI (optional) */}
+					{/* Pay with SUI (same structure as FLOW card) */}
 					{state.suiPaymentOption && (
 						<section
-							className="rounded-2xl border-2 border-[#6fbcf0]/30 bg-[#6fbcf0]/5 p-4 shadow-sm"
+							className="rounded-2xl border border-border bg-card p-4 shadow-sm"
 							aria-label="Pay with SUI"
 						>
 							<div className="flex items-center gap-2">
-								<div className="h-5 w-5 shrink-0 rounded-full bg-[#6fbcf0]" />
+								<Wallet className="h-5 w-5 text-primary" />
 								<h2 className="text-base font-semibold text-foreground">
 									Pay with SUI
 									{state.suiPaymentOption.network ===
@@ -1121,8 +1102,7 @@ export default function PayPage() {
 								{state.suiPaymentOption.network === "testnet"
 									? "testnet"
 									: "mainnet"}{" "}
-								to the address below. After sending, paste the
-								transaction digest to verify.
+								to the address below.
 							</p>
 							<div className="mt-4 space-y-3">
 								<div>
@@ -1133,13 +1113,6 @@ export default function PayPage() {
 										{state.suiPaymentOption.amountSui}{" "}
 										{state.suiPaymentOption.currency}
 									</p>
-									<CopyButton
-										value={`${state.suiPaymentOption.amountSui} ${state.suiPaymentOption.currency}`}
-										buttonText="Copy"
-										variant="ghost"
-										size="xs"
-										className="mt-1 -ml-1 rounded-lg"
-									/>
 								</div>
 								<div>
 									<p className="text-xs font-medium text-muted-foreground">
@@ -1244,7 +1217,7 @@ export default function PayPage() {
 												);
 											}
 										}}
-										className="w-full rounded-md border-2 border-[#6fbcf0] bg-[#6fbcf0] py-3 font-semibold text-white hover:bg-[#5aabdf] hover:text-white"
+										className="w-full py-3 font-medium"
 									>
 										{suiWallet.connectionStatus ===
 										"disconnected"
@@ -1261,21 +1234,24 @@ export default function PayPage() {
 											{suiPayError}
 										</p>
 									)}
-									<p className="text-center text-xs text-muted-foreground">
+									<p className="text-xs text-muted-foreground">
 										{suiWallet.connectionStatus ===
 										"disconnected"
-											? "Connect your Sui wallet extension to pay"
-											: "Opens your Sui wallet extension to sign and send"}
+											? "Connect your Sui wallet extension to pay."
+											: "Opens your Sui wallet extension to sign and send."}
 									</p>
 								</div>
-								<div className="border-t border-border pt-3">
-									<p className="mb-1.5 text-xs font-medium text-muted-foreground">
-										Already sent? Verify with transaction
-										digest
-									</p>
+								<div className="border-t border-border pt-4">
+									<div className="flex items-center gap-2">
+										<Hash className="h-5 w-5 text-muted-foreground" />
+										<h3 className="text-sm font-semibold text-foreground">
+											Already sent? Verify with
+											transaction digest
+										</h3>
+									</div>
 									<form
 										onSubmit={handleVerifySui}
-										className="flex flex-col gap-2 sm:flex-row sm:items-end"
+										className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-end"
 									>
 										<input
 											id="suiTransactionDigest"
@@ -1319,14 +1295,14 @@ export default function PayPage() {
 						</section>
 					)}
 
-					{/* Pay with Starknet (optional) */}
+					{/* Pay with Starknet (same structure as FLOW card) */}
 					{state.starknetPaymentOption && (
 						<section
-							className="rounded-2xl border-2 border-purple-500/30 bg-purple-500/5 p-4 shadow-sm"
+							className="rounded-2xl border border-border bg-card p-4 shadow-sm"
 							aria-label="Pay with Starknet"
 						>
 							<div className="flex items-center gap-2">
-								<div className="h-5 w-5 shrink-0 rounded-full bg-purple-600" />
+								<Wallet className="h-5 w-5 text-primary" />
 								<h2 className="text-base font-semibold text-foreground">
 									Pay with Starknet
 									<span className="ml-1.5 text-xs font-normal text-muted-foreground">
@@ -1335,8 +1311,7 @@ export default function PayPage() {
 								</h2>
 							</div>
 							<p className="mt-1.5 text-sm text-muted-foreground">
-								Send USDC on Starknet Sepolia to the address below,
-								then paste the transaction hash to verify.
+								Send USDC on Starknet Sepolia to the address below.
 							</p>
 							<div className="mt-4 space-y-3">
 								<div>
@@ -1347,13 +1322,6 @@ export default function PayPage() {
 										{state.starknetPaymentOption.amountUsdc}{" "}
 										{state.starknetPaymentOption.currency}
 									</p>
-									<CopyButton
-										value={`${state.starknetPaymentOption.amountUsdc} ${state.starknetPaymentOption.currency}`}
-										buttonText="Copy"
-										variant="ghost"
-										size="xs"
-										className="mt-1 -ml-1 rounded-lg"
-									/>
 								</div>
 								<div>
 									<p className="text-xs font-medium text-muted-foreground">
@@ -1385,7 +1353,7 @@ export default function PayPage() {
 											subscriptionNeedsGithub
 										}
 										onClick={handlePayWithStarknet}
-										className="w-full rounded-md border-2 border-purple-600 bg-purple-600 py-3 font-semibold text-white hover:bg-purple-700 hover:text-white"
+										className="w-full py-3 font-medium"
 									>
 										{!starknetAccount
 											? "Connect Starknet Wallet"
@@ -1401,19 +1369,23 @@ export default function PayPage() {
 											{starknetPayError}
 										</p>
 									)}
-									<p className="text-center text-xs text-muted-foreground">
+									<p className="text-xs text-muted-foreground">
 										{!starknetAccount
-											? "Connect your Starknet wallet (Braavos, Argent, etc.) to pay"
-											: "Opens your Starknet wallet to sign and send USDC"}
+											? "Connect your Starknet wallet (Braavos, Argent, etc.) to pay."
+											: "Opens your Starknet wallet to sign and send USDC."}
 									</p>
 								</div>
-								<div className="border-t border-border pt-3">
-									<p className="mb-1.5 text-xs font-medium text-muted-foreground">
-										Verify with transaction hash
-									</p>
+								<div className="border-t border-border pt-4">
+									<div className="flex items-center gap-2">
+										<Hash className="h-5 w-5 text-muted-foreground" />
+										<h3 className="text-sm font-semibold text-foreground">
+											Already sent? Verify with
+											transaction hash
+										</h3>
+									</div>
 									<form
 										onSubmit={handleVerifyStarknet}
-										className="flex flex-col gap-2 sm:flex-row sm:items-end"
+										className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-end"
 									>
 										<input
 											id="starknetTransactionHash"
@@ -1521,50 +1493,52 @@ export default function PayPage() {
 										<div className="flex items-center gap-2">
 											<Wallet className="h-5 w-5 text-primary" />
 											<h2 className="text-base font-semibold text-foreground">
-												Pay with your wallet
+												Pay with USDC
 											</h2>
 										</div>
 										<p className="mt-1.5 text-sm text-muted-foreground">
-											Scan the QR code or open your wallet
-											with amount and recipient
-											pre-filled.
+											Send USDC on {networkLabel} to the address below.
 										</p>
-										<div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-start">
-											{qrDataUrl && (
-												<div className="shrink-0 overflow-hidden rounded-md border border-border bg-white p-2.5 shadow-sm">
-													{/* eslint-disable-next-line @next/next/no-img-element -- QR data URL */}
-													<img
-														src={qrDataUrl}
-														alt="Payment QR code"
-														width={200}
-														height={200}
-													/>
-												</div>
-											)}
-											<div className="flex flex-1 flex-col gap-2">
-												<Button
-													type="button"
-													onClick={
-														handlePayWithWallet
-													}
-													disabled={
-														isWritePending ||
-														subscriptionNeedsGithub
-													}
-													className="w-full py-3 font-medium sm:w-auto"
-												>
-													{!isConnected
-														? "Connect wallet"
-														: isWritePending
-															? "Confirm in wallet…"
-															: "Pay with wallet"}
-												</Button>
-												<p className="text-xs text-muted-foreground">
-													{!isConnected
-														? `Connect to pay with USDC on ${networkLabel}.`
-														: "Opens your wallet with recipient and amount pre-filled."}
+										<div className="mt-4 space-y-3">
+											<div>
+												<p className="text-xs font-medium text-muted-foreground">Amount</p>
+												<p className="mt-1 font-semibold tabular-nums text-foreground">
+													{price} {state.currency ?? "USDC"}
 												</p>
 											</div>
+											<div>
+												<p className="text-xs font-medium text-muted-foreground">Recipient address</p>
+												<div className="mt-1.5 flex flex-wrap items-center gap-2">
+													<code className="max-w-full break-all rounded-lg bg-muted/60 px-2 py-1.5 font-mono text-sm">
+														{recipientAddress}
+													</code>
+													<CopyButton
+														value={recipientAddress}
+														label="Copy address"
+														buttonText="Copy"
+														variant="outline"
+														size="xs"
+														className="rounded-lg"
+													/>
+												</div>
+											</div>
+											<Button
+												type="button"
+												onClick={handlePayWithWallet}
+												disabled={isWritePending || subscriptionNeedsGithub}
+												className="w-full py-3 font-medium"
+											>
+												{!isConnected
+													? "Connect wallet"
+													: isWritePending
+														? "Confirm in wallet…"
+														: "Send USDC"}
+											</Button>
+											<p className="text-xs text-muted-foreground">
+												{!isConnected
+													? `Connect to pay with USDC on ${networkLabel}.`
+													: "Opens your wallet to send USDC."}
+											</p>
 										</div>
 									</>
 								) : (
@@ -1585,7 +1559,7 @@ export default function PayPage() {
 										</h3>
 									</div>
 									<form
-										className="mt-2"
+										className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-end"
 										onSubmit={(e) => {
 											if (subscriptionNeedsGithub) {
 												e.preventDefault();
@@ -1606,7 +1580,7 @@ export default function PayPage() {
 											type="text"
 											required
 											placeholder="Paste 0x… transaction hash"
-											className="w-full rounded-md border border-input bg-background px-3.5 py-2.5 font-mono text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+											className="min-w-0 flex-1 rounded-md border border-input bg-background px-3.5 py-2.5 font-mono text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
 											disabled={
 												state.status === "verifying"
 											}
@@ -1618,7 +1592,7 @@ export default function PayPage() {
 												state.status === "verifying" ||
 												subscriptionNeedsGithub
 											}
-											className="mt-2 w-full py-2.5 font-medium sm:w-auto sm:min-w-[140px]"
+											className="rounded-md py-2.5 font-medium sm:w-auto sm:min-w-[140px]"
 										>
 											{state.status === "confirming"
 												? "Confirming…"
@@ -1626,13 +1600,13 @@ export default function PayPage() {
 													? "Verifying…"
 													: "Verify payment"}
 										</Button>
-										{subscriptionNeedsGithub && (
-											<p className="mt-1.5 text-xs text-muted-foreground">
-												Save your GitHub username above
-												before verifying.
-											</p>
-										)}
 									</form>
+									{subscriptionNeedsGithub && (
+										<p className="mt-1.5 text-xs text-muted-foreground">
+											Save your GitHub username above
+											before verifying.
+										</p>
+									)}
 								</div>
 							</section>
 						)}

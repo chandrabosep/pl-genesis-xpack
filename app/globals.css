@@ -84,6 +84,32 @@
 	--sidebar-ring: oklch(0.55 0.25 293);
 }
 
+/* Chain pay themes: same structure as flow-pay, only primary color differs */
+.base-pay {
+	--primary: #0000ff;
+	--primary-foreground: #ffffff;
+	--ring: #0000ff;
+}
+
+.sui-pay {
+	--primary: #2a8dff;
+	--primary-foreground: oklch(0.99 0 0);
+	--ring: #2a8dff;
+}
+
+.starknet-pay {
+	--primary: #e377a4;
+	--primary-foreground: #ffffff;
+	--ring: #e377a4;
+}
+
+.flow-pay {
+	/* Flow theme: green — reference structure; others inherit from :root and only override primary above */
+	--primary: #00ef8c;
+	--primary-foreground: oklch(0.145 0 0);
+	--ring: #00ef8c;
+}
+
 .dark {
 	--background: oklch(0.145 0 0);
 	--foreground: oklch(0.985 0 0);
