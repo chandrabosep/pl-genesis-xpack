@@ -207,7 +207,7 @@ export default function PayPage() {
 		isSuccess: isReceiptSuccess,
 		isError: isReceiptError,
 		error: receiptError,
-	} = useWaitForTransactionReceipt({ hash: pendingEvmHash });
+	} = useWaitForTransactionReceipt({ hash: pendingEvmHash as `0x${string}` });
 
 	const paymentUri =
 		state.status === "ready" ||
