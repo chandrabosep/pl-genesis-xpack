@@ -3,7 +3,9 @@
 <img width="1471" alt="image" src="./public/1.jpg">
 
 ##
-**Xpack** is a crypto-native monetization platform for npm packages, enabling developers to monetize open-source code worldwide. Authors connect their wallet, add a simple config and preinstall script, and receive on-chain payments with no need for custom backends, payment processors, or bank accounts. At install time, users pay with **SUI** (on Sui network), **USDC** (on EVM chains and Starknet), or **FLOW** (on Flow EVM chain) depending on the chain—once payment is confirmed, installation resumes automatically. Xpack bridges traditional npm distribution with on-chain payments and provides authors with a unified dashboard for pricing, revenue, installs, and multi-network payments (Sui, Starknet, Base Sepolia, Flow EVM, and more).
+
+**Xpack** is a crypto-native monetization platform for npm packages, making it easy for developers to get paid for open-source code—no custom backend or bank required. Just connect your wallet, add our config and preinstall script, and publish to npm. During install, users are prompted to pay with **FLOW**, **STARKNET (USDC)**, **BASE (USDC)**, or **SUI**, depending on their selected blockchain. Once payment is received on-chain, the install continues automatically. Xpack seamlessly links npm package distribution with direct payments, and gives authors a single dashboard for pricing, revenue, installs, and payment management across Flow, Starknet, Base, and Sui networks.
+
 
 ## Features
 
@@ -17,17 +19,15 @@
 
 - **Real-time dashboard**: Track revenue, installs, and payments in one place. Manage your monetized packages and optimize your open-source business.
 
-
 ## Test packages
 
-| Package                           | Description                |
-| --------------------------------- | -------------------------- |
-| **Starknet (USDC payments)**      | `npm i xpack-starknet`     |
-| **Sui payments (SUI)**            | `npm i xpack-sui`          |
-| **Per-device pricing**            | `npm i xpack-per-device`   |
-| **Per-user pricing**              | `npm i xpack-per-user`     |
-| **Subscription pricing**          | `npm i xpack-subscription` |
-
+| Package                      | Description                |
+| ---------------------------- | -------------------------- |
+| **Starknet (USDC payments)** | `npm i xpack-starknet`     |
+| **Flow EVM (FLOW)**          | `npm i xpack-flow`         |
+| **Per-device pricing**       | `npm i xpack-per-device`   |
+| **Per-user pricing**         | `npm i xpack-per-user`     |
+| **Subscription pricing**     | `npm i xpack-subscription` |
 
 ## Why this matters
 
@@ -36,7 +36,6 @@
 | **2.6B+** weekly npm downloads    | Across 32M+ developers and businesses                             |
 | **0** native monetization         | No built-in way to charge for npm packages today                  |
 | **480K+** potential paid packages | A massive, untapped monetization opportunity across the ecosystem |
-
 
 ## Team
 

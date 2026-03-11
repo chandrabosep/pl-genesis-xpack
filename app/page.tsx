@@ -113,7 +113,7 @@ export default function LandingPage() {
 			icon: CircleDollarSign,
 			title: "Multi-chain & Multi-currency",
 			description:
-				"Accept ETH, USDC, and more on major EVM chains and Sui. Get paid in your preferred currency.",
+				"Accept payments on Flow, Starknet, Base, Sui, and major EVM chains using ETH, USDC, and more.",
 		},
 	];
 
