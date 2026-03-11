@@ -42,6 +42,10 @@ export default function DashboardPage() {
 	});
 
 	const projects: ProjectSummary[] = projectsData?.projects ?? [];
+	const sortedProjects = [...projects].sort(
+		(a, b) =>
+			new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+	);
 	const error = projectsError?.message ?? null;
 
 	const clearFilters = () => {
@@ -161,7 +165,7 @@ export default function DashboardPage() {
 					</SelectTrigger>
 					<SelectContent>
 						<SelectItem value="all">All projects</SelectItem>
-						{projects.map((p) => (
+						{sortedProjects.map((p) => (
 							<SelectItem key={p.id} value={p.id}>
 								{p.name}
 							</SelectItem>
@@ -265,7 +269,7 @@ export default function DashboardPage() {
 									</tr>
 								</thead>
 								<tbody>
-									{projects.map((project) => (
+									{sortedProjects.map((project) => (
 										<DashboardPackageRow
 											key={project.id}
 											project={project}

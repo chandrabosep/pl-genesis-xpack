@@ -27,7 +27,7 @@ export function DashboardPackageRow({
 				</td>
 				<td className="px-4 py-3 text-gray-600">
 					<div className="inline-flex items-center gap-2">
-						<span className="inline-flex h-6 w-6 items-center justify-center rounded-full ">
+						<span className="inline-flex size-8 items-center justify-center rounded-full ">
 							<Image
 								src={
 									project.receiveMode === "sui"
@@ -39,9 +39,9 @@ export function DashboardPackageRow({
 												: "/logos/base.png"
 								}
 								alt={paymentTypeLabel(project.receiveMode)}
-								width={16}
-								height={16}
-								className="rounded-full"
+								width={100}
+								height={100}
+								className="rounded-full size-6"
 							/>
 						</span>
 						<span>{paymentTypeLabel(project.receiveMode)}</span>
@@ -52,7 +52,7 @@ export function DashboardPackageRow({
 				</td>
 				<td className="px-4 py-3 text-gray-900">
 					<div className="inline-flex items-center gap-2">
-						<span className="inline-flex h-6 w-6 items-center justify-center rounded-full">
+						<span className="inline-flex size-8 items-center justify-center rounded-full">
 							<Image
 								src={
 									project.receiveMode === "sui"
@@ -68,9 +68,9 @@ export function DashboardPackageRow({
 											? "FLOW"
 											: "USDC"
 								}
-								width={16}
-								height={16}
-								className="rounded-full"
+								width={100}
+								height={100}
+								className="rounded-full size-6"
 							/>
 						</span>
 						<span>
