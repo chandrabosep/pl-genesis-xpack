@@ -2,6 +2,7 @@
 
 import { useAccount } from "wagmi";
 import Link from "next/link";
+import Image from "next/image";
 import ConnectButton from "@/components/common/connect-btn";
 import Hero from "@/components/landing-ui/Hero";
 import ResuableCard from "@/components/landing-ui/ReuseableCard";
@@ -222,28 +223,70 @@ export default function LandingPage() {
 						<div className="grid gap-3 w-full max-w-xl">
 							{[
 								{
-									label: "Flow EVM",
-									package: "xpack-flow",
+									label: "Per Device",
+									chainLabel: "Flow EVM",
+									pricingLabel: "Per device",
+									price: "1 FLOW",
+									chainIcon: "/logos/flow.png",
+									package: "x-per-device",
 								},
 								{
-									label: "Starknet",
-									package: "xpack-starknet",
+									label: "Subscription Based",
+									chainLabel: "Flow EVM",
+									pricingLabel: "Subscription",
+									price: "1 FLOW",
+									chainIcon: "/logos/flow.png",
+									package: "x-per-subscription",
 								},
 								{
-									label: "Per-device pricing",
-									package: "xpack-per-device",
+									label: "Per User",
+									chainLabel: "Starknet",
+									pricingLabel: "Per user",
+									price: "0.1 USDC",
+									chainIcon: "/logos/starknet.png",
+									package: "x-per-usage",
 								},
-							].map(({ label, package: pkg }) => (
+								{
+									label: "Base Gateway",
+									chainLabel: "Base",
+									pricingLabel: "Per device",
+									price: "0.1 USDC",
+									chainIcon: "/logos/base.png",
+									package: "x-base-gateway",
+								},
+								{
+									label: "Sui Gateway",
+									chainLabel: "Sui",
+									pricingLabel: "Per device",
+									price: "0.01 SUI",
+									chainIcon: "/logos/sui.png",
+									package: "x-sui-gateway",
+								},
+							].map(({ label, chainLabel, pricingLabel, price, chainIcon, package: pkg }) => (
 								<div
 									key={pkg}
 									className="rounded-lg border px-5 py-4 flex items-center justify-between"
 								>
-									<div>
-										<span className="font-semibold text-foreground">
-											{label}
-										</span>
+									<div className="flex items-center gap-3 min-w-0">
+										<div className="flex shrink-0 items-center gap-1.5">
+											<Image
+												src={chainIcon}
+												alt={chainLabel}
+												width={24}
+												height={24}
+												className="rounded-full size-6 object-contain"
+											/>
+										</div>
+										<div className="min-w-0">
+											<span className="font-semibold text-foreground block">
+												{label}
+											</span>
+											<span className="text-sm text-muted-foreground">
+												{chainLabel} ·{pricingLabel}·  <span className="text-purple-700 font-medium">{price}</span> 
+											</span>
+										</div>
 									</div>
-									<div className="flex items-center gap-2">
+									<div className="flex items-center gap-2 shrink-0 font-medium">
 										<code className="bg-background rounded px-2 py-1 text-purple-700 font-mono text-sm">
 											npm i {pkg}
 										</code>

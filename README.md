@@ -18,15 +18,17 @@
 
 - **Real-time dashboard**: Track revenue, installs, and payments in one place. Manage your monetized packages and optimize your open-source business.
 
-## Test packages
+## Install packages
 
-| Package                      | Description                |
-| ---------------------------- | -------------------------- |
-| **Starknet (USDC payments)** | `npm i xpack-starknet`     |
-| **Flow EVM (FLOW)**          | `npm i xpack-flow`         |
-| **Per-device pricing**       | `npm i xpack-per-device`   |
-| **Per-user pricing**         | `npm i xpack-per-user`     |
-| **Subscription pricing**     | `npm i xpack-subscription` |
+These packages are used for installs. Install with the command shown; payment type, pricing model, and price are below.
+
+| Package name         | Payment type | Pricing model | Price    | Install                |
+| -------------------- | ------------ | ------------- | -------- | ---------------------- |
+| Per Device           | Flow EVM     | Per device    | 1 FLOW   | `npm i x-per-device`        |
+| Subscription Based   | Flow EVM     | Subscription  | 1 FLOW   | `npm i x-per-subscription` |
+| Per User             | Starknet     | Per user      | 0.1 USDC | `npm i x-per-usage`        |
+| Base Gateway         | Base         | Per device    | 0.1 USDC | `npm i x-base-gateway`     |
+| Sui Gateway          | Sui          | Per device    | 0.01 SUI | `npm i x-sui-gateway`      |
 
 ## Why this matters
 
