@@ -91,7 +91,7 @@ function Hero() {
 								</div>
 							</div>
 							<div className="flex flex-wrap gap-3">
-								{["usdc.png", "flow.png", "sui.png"].map(
+								{["usdc.png", "flow.png"].map(
 									(symbol) => (
 										<Image
 											key={symbol}
@@ -99,7 +99,7 @@ function Hero() {
 											alt={symbol}
 											width={500}
 											height={500}
-											className="rounded-full size-6"
+											className="rounded-full size-7"
 										/>
 									),
 								)}
@@ -210,38 +210,38 @@ function Hero() {
 														<Image
 															src="/logos/flow.png"
 															alt="Flow"
-															width={20}
-															height={20}
-															className="rounded-full"
+															width={100}
+															height={100}
+															className="rounded-full size-6"
 														/>
 														<Image
 															src="/logos/starknet.png"
 															alt="Starknet"
-															width={20}
-															height={20}
-															className="rounded-full"
+															width={100}
+															height={100}
+															className="rounded-full size-6"
 														/>
 														<Image
 															src="/logos/eth.png"
 															alt="Base"
-															width={20}
-															height={20}
-															className="rounded-full"
+															width={100}
+															height={100}
+															className="rounded-full size-6"
 														/>
-														<Image
+														{/* <Image
 															src="/logos/base.png"
 															alt="Base"
-															width={20}
-															height={20}
-															className="rounded-full"
+															width={100}
+															height={100}
+															className="rounded-full size-6"
 														/>
 														<Image
 															src="/logos/sui.png"
 															alt="Sui"
-															width={20}
-															height={20}
-															className="rounded-full"
-														/>
+															width={100}
+															height={100}
+															className="rounded-full size-6"
+														/> */}
 													</span>
 												</span>
 											</li>
