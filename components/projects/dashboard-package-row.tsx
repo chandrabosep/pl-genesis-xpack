@@ -36,7 +36,7 @@ export function DashboardPackageRow({
 											? "/logos/flow.png"
 											: project.receiveMode === "starknet"
 												? "/logos/starknet.png"
-												: "/logos/base.jpg"
+												: "/logos/base.png"
 								}
 								alt={paymentTypeLabel(project.receiveMode)}
 								width={16}

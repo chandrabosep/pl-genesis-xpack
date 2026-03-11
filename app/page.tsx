@@ -222,19 +222,18 @@ export default function LandingPage() {
 						<div className="grid gap-3 w-full max-w-xl">
 							{[
 								{
-									label: "Starknet",
-									sub: "(coming soon)",
-									package: "xpack-starknet",
+									label: "Flow EVM",
+									package: "xpack-flow",
 								},
 								{
-									label: "Sui payments",
-									package: "xpack-sui",
+									label: "Starknet",
+									package: "xpack-starknet",
 								},
 								{
 									label: "Per-device pricing",
 									package: "xpack-per-device",
 								},
-							].map(({ label, sub, package: pkg }) => (
+							].map(({ label, package: pkg }) => (
 								<div
 									key={pkg}
 									className="rounded-lg border px-5 py-4 flex items-center justify-between"
@@ -243,11 +242,6 @@ export default function LandingPage() {
 										<span className="font-semibold text-foreground">
 											{label}
 										</span>
-										{sub && (
-											<span className="ml-2 text-xs text-primary align-middle">
-												{sub}
-											</span>
-										)}
 									</div>
 									<div className="flex items-center gap-2">
 										<code className="bg-background rounded px-2 py-1 text-purple-700 font-mono text-sm">

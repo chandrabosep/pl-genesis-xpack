@@ -15,6 +15,7 @@ import {
 	LayoutDashboard,
 	Network,
 } from "lucide-react";
+import Image from "next/image";
 
 const jetBrainsMono = JetBrains_Mono({
 	subsets: ["latin"],
@@ -75,7 +76,7 @@ function Hero() {
 					</div>
 					<div className="lg:col-span-6 relative h-[540px] reveal-up">
 						{/* Card 1: Payments we accept — theme: purple/cyan only */}
-						<div className="bg-white absolute top-0 right-0 w-[55%] rounded-2xl z-20 overflow-hidden border bg-linear-to-br from-accent/10 to-accent/5 p-5 border-purple-200 shadow-xl shadow-purple-600/5 transition-all duration-300">
+						<div className="bg-white absolute bottom-[10%] left-[45%] right-0 w-[50%] rounded-2xl z-30  overflow-hidden border bg-linear-to-br from-accent/10 to-accent/5 p-5 border-purple-200 shadow-xl shadow-purple-600/5 transition-all duration-300">
 							<div className="flex items-center gap-2 mb-4">
 								<div className="flex h-9 w-9 items-center justify-center rounded-xl text-purple-600">
 									<Coins className="h-5 w-5" />
@@ -89,15 +90,17 @@ function Hero() {
 									</p>
 								</div>
 							</div>
-							<div className="flex flex-wrap gap-2">
-								{["USDC", "SUI","ETH"].map(
+							<div className="flex flex-wrap gap-3">
+								{["usdc.png", "flow.png", "sui.png"].map(
 									(symbol) => (
-										<span
+										<Image
 											key={symbol}
-											className="inline-flex items-center px-3 py-2 rounded-lg bg-purple-50 border text-purple-700 text-xs font-semibold border-purple-200 transition-colors"
-										>
-											{symbol}
-										</span>
+											src={`/logos/${symbol}`}
+											alt={symbol}
+											width={500}
+											height={500}
+											className="rounded-full size-6"
+										/>
 									),
 								)}
 							</div>
@@ -157,7 +160,7 @@ function Hero() {
 						</div>
 
 						{/* Card 3: Features — purple/cyan gradient accent, same borders/shadows */}
-						<div className="bg-white absolute bottom-[10%] left-[45%] right-0 w-[50%] rounded-2xl z-30 overflow-hidden border bg-linear-to-br from-accent/10 to-accent/5 p-5 border-purple-200 shadow-xl shadow-purple-600/5 transition-all duration-300">
+						<div className="bg-white absolute top-0 right-0 w-[55%] rounded-2xl z-20 overflow-hidden border bg-linear-to-br from-accent/10 to-accent/5 p-5 border-purple-200 shadow-xl shadow-purple-600/5 transition-all duration-300">
 							<div className="flex items-center gap-2 mb-3 mt-1">
 								<div className="flex h-9 w-9 items-center justify-center rounded-xl text-purple-600">
 									<Sparkles className="h-5 w-5" />
@@ -177,31 +180,89 @@ function Hero() {
 										text: "Monetize native npm packages",
 										Icon: LayoutDashboard,
 									},
+									// {
+									// 	text: "SUI, USDC, FLOW payments",
+									// 	Icon: Package,
+									// },
 									{
-										text: "USDC (EVM) + SUI payments",
-										Icon: Package,
-									},
-									{
-										text: "Multi-network payouts (EVM, Sui, Starknet)",
+										text: "",
 										Icon: Network,
+										isMultiNetwork: true,
 									},
 									// {
 									// 	text: "Per-device, per-user & subscription licensing",
 									// 	Icon: KeyRound,
 									// },
-								].map(({ text, Icon }) => (
-									<li
-										key={text}
-										className="flex items-center gap-3 rounded-lg py-2 px-2.5 hover:bg-white/50 transition-colors"
-									>
-										<div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-purple-600">
-											<Icon className="h-3.5 w-3.5" />
-										</div>
-										<span className="text-sm text-gray-700">
-											{text}
-										</span>
-									</li>
-								))}
+								].map((item) => {
+									if (item.isMultiNetwork) {
+										return (
+											<li
+												key={item.text}
+												className="flex items-center gap-3 rounded-lg py-2 px-2.5 hover:bg-white/50 transition-colors"
+											>
+												<div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-purple-600">
+													{item.Icon && (
+														<item.Icon className="h-3.5 w-3.5" />
+													)}
+												</div>
+												<span className="text-sm text-gray-700 flex items-center gap-4">
+													<span className="flex items-center gap-3">
+														<Image
+															src="/logos/flow.png"
+															alt="Flow"
+															width={20}
+															height={20}
+															className="rounded-full"
+														/>
+														<Image
+															src="/logos/starknet.png"
+															alt="Starknet"
+															width={20}
+															height={20}
+															className="rounded-full"
+														/>
+														<Image
+															src="/logos/eth.png"
+															alt="Base"
+															width={20}
+															height={20}
+															className="rounded-full"
+														/>
+														<Image
+															src="/logos/base.png"
+															alt="Base"
+															width={20}
+															height={20}
+															className="rounded-full"
+														/>
+														<Image
+															src="/logos/sui.png"
+															alt="Sui"
+															width={20}
+															height={20}
+															className="rounded-full"
+														/>
+													</span>
+												</span>
+											</li>
+										);
+									}
+									return (
+										<li
+											key={item.text}
+											className="flex items-center gap-3 rounded-lg py-2 px-2.5 hover:bg-white/50 transition-colors"
+										>
+											<div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-purple-600">
+												{item.Icon && (
+													<item.Icon className="h-3.5 w-3.5" />
+												)}
+											</div>
+											<span className="text-sm text-gray-700">
+												{item.text}
+											</span>
+										</li>
+									);
+								})}
 							</ul>
 						</div>
 					</div>

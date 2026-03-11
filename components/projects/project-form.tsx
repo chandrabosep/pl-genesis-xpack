@@ -50,14 +50,12 @@ export function ProjectForm(props: {
 	const starknetAddress = props.starknetAddress ?? "";
 	const isSui = receiveMode === "sui";
 	const isStarknet = receiveMode === "starknet";
-	const tokenLabel =
-		isSui ? "SUI" : receiveMode === "flow" ? "FLOW" : "USDC";
-	const tokenLogoSrc =
-		isSui
-			? "/logos/sui.png"
-			: receiveMode === "flow"
-				? "/logos/flow.png"
-				: "/logos/usdc.png";
+	const tokenLabel = isSui ? "SUI" : receiveMode === "flow" ? "FLOW" : "USDC";
+	const tokenLogoSrc = isSui
+		? "/logos/sui.png"
+		: receiveMode === "flow"
+			? "/logos/flow.png"
+			: "/logos/usdc.png";
 
 	return (
 		<form
@@ -155,7 +153,7 @@ export function ProjectForm(props: {
 						/>
 						<span className="flex items-center gap-2">
 							<Image
-								src="/logos/base.jpg"
+								src="/logos/base.png"
 								alt="Base"
 								width={18}
 								height={18}
@@ -332,7 +330,7 @@ export function ProjectList(props: {
 										/>
 									) : (
 										<Image
-											src="/logos/base.jpg"
+											src="/logos/base.png"
 											alt="Base"
 											width={14}
 											height={14}
