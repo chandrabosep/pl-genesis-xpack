@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import type { ProjectSummary } from "@/types/projects";
 import { pricingModelLabel, paymentTypeLabel } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -25,14 +26,62 @@ export function DashboardPackageRow({
 					{project.name}
 				</td>
 				<td className="px-4 py-3 text-gray-600">
-					{paymentTypeLabel(project.receiveMode)}
+					<div className="inline-flex items-center gap-2">
+						<span className="inline-flex h-6 w-6 items-center justify-center rounded-full ">
+							<Image
+								src={
+									project.receiveMode === "sui"
+										? "/logos/sui.png"
+										: project.receiveMode === "flow"
+											? "/logos/flow.png"
+											: project.receiveMode === "starknet"
+												? "/logos/starknet.png"
+												: "/logos/base.jpg"
+								}
+								alt={paymentTypeLabel(project.receiveMode)}
+								width={16}
+								height={16}
+								className="rounded-full"
+							/>
+						</span>
+						<span>{paymentTypeLabel(project.receiveMode)}</span>
+					</div>
 				</td>
 				<td className="px-4 py-3 text-gray-600">
 					{pricingModelLabel(project.pricingModel)}
 				</td>
 				<td className="px-4 py-3 text-gray-900">
-					{project.price ?? 0}{" "}
-					{project.receiveMode === "sui" ? "SUI" : project.receiveMode === "flow" ? "FLOW" : "USDC"}
+					<div className="inline-flex items-center gap-2">
+						<span className="inline-flex h-6 w-6 items-center justify-center rounded-full">
+							<Image
+								src={
+									project.receiveMode === "sui"
+										? "/logos/sui.png"
+										: project.receiveMode === "flow"
+											? "/logos/flow.png"
+											: "/logos/usdc.png"
+								}
+								alt={
+									project.receiveMode === "sui"
+										? "SUI"
+										: project.receiveMode === "flow"
+											? "FLOW"
+											: "USDC"
+								}
+								width={16}
+								height={16}
+								className="rounded-full"
+							/>
+						</span>
+						<span>
+							{project.price ?? 0}{" "}
+							{project.receiveMode === "sui"
+								? "SUI"
+								: project.receiveMode === "flow"
+									? "FLOW"
+									: "USDC"}
+						</span>
+					</div>
 				</td>
 				<td className="px-4 py-3">
 					<span className="inline-flex items-center rounded-full border border-purple-200/50 bg-purple-50 px-2.5 py-0.5 text-xs font-medium text-purple-700">

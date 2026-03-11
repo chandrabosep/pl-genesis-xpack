@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useWalletAddress } from "@/lib/auth/use-wallet-address";
 import type { ProjectSummary } from "@/types/projects";
 import type { InstallLogEntry } from "@/types/logs";
@@ -151,7 +152,24 @@ export default function LogsPage() {
 											</Badge>
 										</td>
 										<td className="py-3 px-4 text-right">
-											{log.amount != null ? `${log.amount} USDC` : "—"}
+											{log.amount != null ? (
+												<span className="inline-flex items-center justify-end gap-2">
+													<span className="inline-flex h-6 w-6 items-center justify-center rounded-full">
+														<Image
+															src="/logos/usdc.png"
+															alt="USDC"
+															width={16}
+															height={16}
+															className="rounded-full"
+														/>
+													</span>
+													<span className="tabular-nums">
+														{log.amount} USDC
+													</span>
+												</span>
+											) : (
+												"—"
+											)}
 										</td>
 									</tr>
 								))}

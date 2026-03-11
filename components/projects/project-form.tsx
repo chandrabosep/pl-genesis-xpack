@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { getSuiNetwork } from "@/lib/x402/payment-config";
 import { PricingModel } from "@/types/constants";
 import { ProjectSummary } from "@/types/projects";
@@ -11,7 +12,11 @@ import {
 	SelectValue,
 } from "@/components/ui/select";
 
-const pricingOptions: PricingModel[] = ["per_device", "subscription", "per_user"];
+const pricingOptions: PricingModel[] = [
+	"per_device",
+	"subscription",
+	"per_user",
+];
 type ReceiveMode = "base" | "sui" | "starknet" | "flow";
 
 function pricingOptionLabel(model: PricingModel): string {
@@ -45,6 +50,14 @@ export function ProjectForm(props: {
 	const starknetAddress = props.starknetAddress ?? "";
 	const isSui = receiveMode === "sui";
 	const isStarknet = receiveMode === "starknet";
+	const tokenLabel =
+		isSui ? "SUI" : receiveMode === "flow" ? "FLOW" : "USDC";
+	const tokenLogoSrc =
+		isSui
+			? "/logos/sui.png"
+			: receiveMode === "flow"
+				? "/logos/flow.png"
+				: "/logos/usdc.png";
 
 	return (
 		<form
@@ -61,8 +74,18 @@ export function ProjectForm(props: {
 				/>
 			</div>
 			<div className="flex flex-col gap-1">
-				<label className="text-sm font-medium">
-					Price ({isSui ? "SUI" : "USDC"})
+				<label className="text-sm font-medium flex items-center gap-2">
+					<span>Price</span>
+					<span className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs text-muted-foreground bg-muted/40">
+						<Image
+							src={tokenLogoSrc}
+							alt={tokenLabel}
+							width={14}
+							height={14}
+							className="rounded-full"
+						/>
+						<span>{tokenLabel}</span>
+					</span>
 				</label>
 				<input
 					className="rounded border px-3 py-2"
@@ -78,27 +101,28 @@ export function ProjectForm(props: {
 				/>
 			</div>
 			<div className="flex flex-col gap-2">
-				<label className="text-sm font-medium">Accept payments on</label>
+				<label className="text-sm font-medium">
+					Accept payments on
+				</label>
 				<div className="flex flex-wrap gap-3">
 					<label className="flex items-center gap-2">
 						<input
 							type="radio"
 							name="receiveMode"
-							checked={receiveMode === "base"}
-							onChange={() => props.onReceiveModeChange?.("base")}
+							checked={receiveMode === "flow"}
+							onChange={() => props.onReceiveModeChange?.("flow")}
 							className="rounded border-gray-300"
 						/>
-						<span className="text-sm">Base</span>
-					</label>
-					<label className="flex items-center gap-2">
-						<input
-							type="radio"
-							name="receiveMode"
-							checked={receiveMode === "sui"}
-							onChange={() => props.onReceiveModeChange?.("sui")}
-							className="rounded border-gray-300"
-						/>
-						<span className="text-sm">Sui</span>
+						<span className="flex items-center gap-2">
+							<Image
+								src="/logos/flow.png"
+								alt="Flow EVM"
+								width={18}
+								height={18}
+								className="rounded-full"
+							/>
+							<span className="text-sm">Flow EVM</span>
+						</span>
 					</label>
 					<label className="flex items-center gap-2">
 						<input
@@ -110,22 +134,61 @@ export function ProjectForm(props: {
 							}
 							className="rounded border-gray-300"
 						/>
-						<span className="text-sm">Starknet (Sepolia)</span>
+						<span className="flex items-center gap-2">
+							<Image
+								src="/logos/starknet.png"
+								alt="Starknet"
+								width={18}
+								height={18}
+								className="rounded-full"
+							/>
+							<span className="text-sm">Starknet</span>
+						</span>
 					</label>
 					<label className="flex items-center gap-2">
 						<input
 							type="radio"
 							name="receiveMode"
-							checked={receiveMode === "flow"}
-							onChange={() => props.onReceiveModeChange?.("flow")}
+							checked={receiveMode === "base"}
+							onChange={() => props.onReceiveModeChange?.("base")}
 							className="rounded border-gray-300"
 						/>
-						<span className="text-sm">Flow EVM (Testnet)</span>
+						<span className="flex items-center gap-2">
+							<Image
+								src="/logos/base.jpg"
+								alt="Base"
+								width={18}
+								height={18}
+								className="rounded-full"
+							/>
+							<span className="text-sm">Base</span>
+						</span>
+					</label>
+					<label className="flex items-center gap-2">
+						<input
+							type="radio"
+							name="receiveMode"
+							checked={receiveMode === "sui"}
+							onChange={() => props.onReceiveModeChange?.("sui")}
+							className="rounded border-gray-300"
+						/>
+						<span className="flex items-center gap-2">
+							<Image
+								src="/logos/sui.png"
+								alt="Sui"
+								width={18}
+								height={18}
+								className="rounded-full"
+							/>
+							<span className="text-sm">Sui</span>
+						</span>
 					</label>
 				</div>
 				<p className="text-xs text-muted-foreground">
-					{receiveMode === "base" && "USDC on Base Sepolia to your address below."}
-					{receiveMode === "sui" && "SUI on Sui to your address below."}
+					{receiveMode === "base" &&
+						"USDC on Base Sepolia to your address below."}
+					{receiveMode === "sui" &&
+						"SUI on Sui to your address below."}
 					{receiveMode === "starknet" &&
 						"USDC on Starknet Sepolia to your address below."}
 					{receiveMode === "flow" &&
@@ -137,7 +200,7 @@ export function ProjectForm(props: {
 					<label className="text-sm font-medium">
 						{receiveMode === "base"
 							? "USDC payment address (Base Sepolia)"
-							: "FLOW receive address (Flow EVM Testnet)"}
+							: "FLOW receive address (Flow EVM Sepolia)"}
 					</label>
 					<input
 						className="rounded border px-3 py-2 font-mono text-sm"
@@ -153,16 +216,21 @@ export function ProjectForm(props: {
 			)}
 			{isSui && (
 				<div className="flex flex-col gap-1">
-					<label className="text-sm font-medium">Sui receive address</label>
+					<label className="text-sm font-medium">
+						Sui receive address (Sui Testnet)
+					</label>
 					<input
 						className="rounded border px-3 py-2 font-mono text-sm"
 						value={suiAddress}
-						onChange={(event) => props.onSuiAddressChange?.(event.target.value)}
+						onChange={(event) =>
+							props.onSuiAddressChange?.(event.target.value)
+						}
 						placeholder="0x… (64 hex chars)"
 						required
 					/>
 					<p className="text-xs text-muted-foreground">
-						Users pay in SUI to this address on Sui {getSuiNetwork()}.
+						Users pay in SUI to this address on Sui{" "}
+						{getSuiNetwork()}.
 					</p>
 				</div>
 			)}
@@ -175,9 +243,7 @@ export function ProjectForm(props: {
 						className="rounded border px-3 py-2 font-mono text-sm"
 						value={starknetAddress}
 						onChange={(event) =>
-							props.onStarknetAddressChange?.(
-								event.target.value,
-							)
+							props.onStarknetAddressChange?.(event.target.value)
 						}
 						placeholder="0x…"
 						required
@@ -238,10 +304,82 @@ export function ProjectList(props: {
 							<p className="text-sm font-semibold">
 								{project.name}
 							</p>
-							<p className="text-xs text-neutral-600">
-								{project.pricingModel} • Price:{" "}
-								{project.price ?? 0}
-							</p>
+							<div className="flex flex-wrap items-center gap-2 text-xs text-neutral-600">
+								<span className="inline-flex items-center gap-1.5 rounded-full bg-neutral-50 px-2 py-0.5">
+									{project.receiveMode === "sui" ? (
+										<Image
+											src="/logos/sui.png"
+											alt="Sui"
+											width={14}
+											height={14}
+											className="rounded-full"
+										/>
+									) : project.receiveMode === "flow" ? (
+										<Image
+											src="/logos/flow.png"
+											alt="Flow EVM"
+											width={14}
+											height={14}
+											className="rounded-full"
+										/>
+									) : project.receiveMode === "starknet" ? (
+										<Image
+											src="/logos/starknet.png"
+											alt="Starknet"
+											width={14}
+											height={14}
+											className="rounded-full"
+										/>
+									) : (
+										<Image
+											src="/logos/base.jpg"
+											alt="Base"
+											width={14}
+											height={14}
+											className="rounded-full"
+										/>
+									)}
+									<span className="capitalize">
+										{project.receiveMode === "flow"
+											? "Flow EVM"
+											: project.receiveMode}
+									</span>
+								</span>
+								<span className="text-neutral-300">•</span>
+								<span className="inline-flex items-center gap-1.5 rounded-full bg-neutral-50 px-2 py-0.5">
+									<Image
+										src={
+											project.receiveMode === "sui"
+												? "/logos/sui.png"
+												: project.receiveMode === "flow"
+													? "/logos/flow.png"
+													: "/logos/usdc.png"
+										}
+										alt={
+											project.receiveMode === "sui"
+												? "SUI"
+												: project.receiveMode === "flow"
+													? "FLOW"
+													: "USDC"
+										}
+										width={14}
+										height={14}
+										className="rounded-full"
+									/>
+									<span>
+										{project.price ?? 0}{" "}
+										{project.receiveMode === "sui"
+											? "SUI"
+											: project.receiveMode === "flow"
+												? "FLOW"
+												: "USDC"}
+									</span>
+								</span>
+								<span className="text-neutral-300">•</span>
+								<span className="capitalize">
+									{project.pricingModel.replace("_", " ")}
+								</span>
+							</div>
 							<p className="text-xs text-neutral-600 break-all">
 								{project.receiveMode === "sui"
 									? `Sui address: ${project.suiAddress ?? "not set"}`
@@ -252,7 +390,8 @@ export function ProjectList(props: {
 									Add to package.json xpack:
 								</p>
 								<p className="text-xs text-neutral-700 break-all font-mono">
-									&quot;projectId&quot;: &quot;{project.id}&quot;
+									&quot;projectId&quot;: &quot;{project.id}
+									&quot;
 								</p>
 								{project.apiKeyValue ? (
 									<p className="text-xs text-neutral-700 break-all font-mono">
