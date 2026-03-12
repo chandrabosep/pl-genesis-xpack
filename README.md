@@ -43,6 +43,9 @@ Open-source developers power the global software ecosystem yet have no native wa
 
 ## How It Works
 
+<img width="1471" alt="image" src="./public/arc.jpg">
+
+###
 1. **Connect your Web3 wallet** to the Xpack dashboard
 2. **Configure pricing** — choose per-device, per-user, or subscription licensing and set your price
 3. **Add the preinstall script** to your `package.json`
