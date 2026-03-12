@@ -121,8 +121,8 @@ If you believe open source should be sustainable and open, Xpack is for you. Get
 
 ## Resources & Links
 
-- **npm packages:** `x-per-device`, `x-per-subscription`, `x-per-usage`, `x-base-gateway`, `x-sui-gateway`
-- **Dashboard:** *(https://xpack-pl-genesis.vercel.app/dashboard)*
+- **npm packages:** `x-per-device`, `x-per-subscription`, `x-per-usage`
+- **Preview:** *(https://xpack-pl-genesis.vercel.app)*
 - **GitHub:** *(https://github.com/chandrabosep/pl-genesis-xpack)*
 - **Demo Video:** *(link)*
 
