@@ -246,22 +246,6 @@ export default function LandingPage() {
 									chainIcon: "/logos/starknet.png",
 									package: "x-per-usage",
 								},
-								{
-									label: "Base Gateway",
-									chainLabel: "Base",
-									pricingLabel: "Per device",
-									price: "0.1 USDC",
-									chainIcon: "/logos/base.png",
-									package: "x-base-gateway",
-								},
-								{
-									label: "Sui Gateway",
-									chainLabel: "Sui",
-									pricingLabel: "Per device",
-									price: "0.01 SUI",
-									chainIcon: "/logos/sui.png",
-									package: "x-sui-gateway",
-								},
 							].map(({ label, chainLabel, pricingLabel, price, chainIcon, package: pkg }) => (
 								<div
 									key={pkg}
